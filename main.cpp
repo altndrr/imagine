@@ -1,10 +1,34 @@
-//
-// Created by alessandro on 08/03/21.
-//
-
 #include "include/main.h"
+#include "include/common.h"
+#include <string>
 #include <stdio.h>
 
-int main(int argc, char **argv) {
-    printf("Hello world\n");
+void commandHelp() {
+    printf("%s\n", USAGE);
+    exit(0);
+}
+
+void commandVersion() {
+    printf("Version: %s\n", VERSION);
+    exit(0);
+}
+
+int main(int argc, char *argv[]) {
+    // If no argument is passed, call help command.
+    if (argc == 1) {
+        commandHelp();
+    }
+
+    // Call help command.
+    if (arrayContains(argv, "--help") == 0 or arrayContains(argv, "-h") == 0) {
+        commandHelp();
+    }
+
+    // Call version command.
+    if (arrayContains(argv, "--version") == 0) {
+        commandVersion();
+    }
+
+    // If nothing was executed, call help command.
+    commandHelp();
 }
