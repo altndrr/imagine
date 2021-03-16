@@ -7,21 +7,21 @@
 bool arrayContains(char **list, std::string word) {
     for (int i = 0; i < len(list); i++) {
         if (strcmp(list[i], word.c_str()) == 0) {
-            return (0);
+            return 1;
         }
     }
 
-    return (1);
+    return 0;
 }
 
 bool arrayContains(const char **list, std::string word) {
     for (int i = 0; i < len(list); i++) {
         if (strcmp(list[i], word.c_str()) == 0) {
-            return (0);
+            return 1;
         }
     }
 
-    return (1);
+    return 0;
 }
 
 double cpuSecond() {

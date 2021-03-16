@@ -20,12 +20,12 @@ int main(int argc, char *argv[]) {
     }
 
     // Call help command.
-    if (arrayContains(argv, "--help") == 0 or arrayContains(argv, "-h") == 0) {
+    if (arrayContains(argv, "--help") == 1 or arrayContains(argv, "-h") == 1) {
         commandHelp();
     }
 
     // Call version command.
-    if (arrayContains(argv, "--version") == 0) {
+    if (arrayContains(argv, "--version") == 1) {
         commandVersion();
     }
 
