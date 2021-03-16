@@ -1,4 +1,4 @@
-#include "../include/image.h"
+#include "../include/image.cuh"
 #include "../include/common.h"
 #include "../libs/stb/stb_image.h"
 #include "../libs/stb/stb_image_write.h"
