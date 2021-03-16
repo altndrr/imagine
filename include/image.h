@@ -4,6 +4,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
+#include <stdlib.h>
+
 class Image {
 public:
     Image(const char *filename);
@@ -11,6 +13,8 @@ public:
     void dispose();
 
     int getChannels();
+
+    const char *getDevice();
 
     unsigned int *getElement(int index);
 
@@ -24,13 +28,21 @@ public:
 
     int getWidth();
 
+    bool isSynchronized();
+
     void save(const char *filename);
+
+    void setDevice(const char *device);
 
 
 private:
+    const char *_validDevices[2] = {"cpu", "cuda"};
+
+    const char *_device = "cpu";
     const char *_filename;
     int _width, _height, _channels;
-    unsigned char *_data;
+    unsigned char *_d_data, *_h_data;
+    size_t _nBytes;
 };
 
 #endif //IMAGINE_IMAGE_H
