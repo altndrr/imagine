@@ -14,6 +14,8 @@ public:
 
     int getChannels();
 
+    unsigned char *getData();
+
     const char *getDevice();
 
     unsigned int *getElement(int index);

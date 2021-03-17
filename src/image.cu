@@ -41,6 +41,14 @@ int Image::getChannels() {
     return _channels;
 }
 
+unsigned char *Image::getData() {
+    if (strcmp(_device, _validDevices[0]) == 0) {
+        return _h_data;
+    } else {
+        return _d_data;
+    }
+}
+
 const char *Image::getDevice() {
     return _device;
 }
