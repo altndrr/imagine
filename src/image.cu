@@ -89,25 +89,6 @@ int Image::getWidth() {
     return _width;
 }
 
-void Image::setDevice(const char *device) {
-
-    if (arrayContains(_validDevices, device) == 0) {
-        return;
-    }
-
-    if (strcmp(device, _device) != 0) {
-        _device = device;
-
-        if (strcmp(device, _validDevices[0]) == 0) {
-            printf("Move to: cpu\n");
-            cudaMemcpy(_h_data, _d_data, _nBytes, cudaMemcpyDeviceToHost);
-        } else {
-            printf("Move to: cuda\n");
-            cudaMemcpy(_d_data, _h_data, _nBytes, cudaMemcpyHostToDevice);
-        }
-    }
-}
-
 bool Image::isSynchronized() {
     unsigned char *h_d_data_copy = (unsigned char *) malloc(_nBytes);
     cudaMemcpy(h_d_data_copy, _d_data, _nBytes, cudaMemcpyDeviceToHost);
@@ -117,7 +98,6 @@ bool Image::isSynchronized() {
     for (int i = 0; i < getSize() * getChannels(); i++) {
         if (abs(_h_data[i] - h_d_data_copy[i]) > epsilon) {
             match = 0;
-            printf("Arrays do not match!\n");
             break;
         }
     }
@@ -133,4 +113,20 @@ void Image::save(const char *filename) {
     }
 
     stbi_write_png(filename, _width, _height, _channels, _h_data, _width * _channels);
+}
+
+void Image::setDevice(const char *device) {
+    if (arrayContains(_validDevices, device) == 0) {
+        return;
+    }
+
+    if (strcmp(device, _device) != 0) {
+        _device = device;
+
+        if (strcmp(device, _validDevices[0]) == 0) {
+            cudaMemcpy(_h_data, _d_data, _nBytes, cudaMemcpyDeviceToHost);
+        } else {
+            cudaMemcpy(_d_data, _h_data, _nBytes, cudaMemcpyHostToDevice);
+        }
+    }
 }
