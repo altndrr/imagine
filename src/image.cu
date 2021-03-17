@@ -1,5 +1,6 @@
 #include "../include/image.cuh"
 #include "../include/common.h"
+#include "../include/functions.cuh"
 #include "../libs/stb/stb_image.h"
 #include "../libs/stb/stb_image_write.h"
 #include <cuda_runtime.h>
@@ -136,5 +137,16 @@ void Image::setDevice(const char *device) {
         } else {
             cudaMemcpy(_d_data, _h_data, _nBytes, cudaMemcpyHostToDevice);
         }
+    }
+}
+
+void Image::transpose() {
+    if (strcmp(_device, _validDevices[0]) == 0) {
+        transposeOnHost(getData(), getWidth(), getHeight(), getChannels());
+    } else {
+        int blockSize = 1024;
+        dim3 threads(blockSize, 1);
+        dim3 blocks((getSize() + threads.x - 1) / threads.x, 1);
+        transposeOnDevice<<<blocks, threads>>>(getData(), getWidth(), getHeight(), getChannels());
     }
 }

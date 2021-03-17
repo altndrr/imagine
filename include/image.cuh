@@ -36,6 +36,7 @@ public:
 
     void setDevice(const char *device);
 
+    void transpose();
 
 private:
     const char *_validDevices[2] = {"cpu", "cuda"};
