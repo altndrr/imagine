@@ -140,6 +140,40 @@ void Image::setDevice(const char *device) {
     }
 }
 
+void Image::convolution(float *kernel, int kernelSide) {
+    unsigned char *dataCopy;
+
+    if (strcmp(_device, _validDevices[0]) == 0) {
+        // Create a copy of the data on host.
+        dataCopy = (unsigned char *) malloc(_nBytes);
+        for (int i = 0; i < getSize() * getChannels(); i++) {
+            dataCopy[i] = getData()[i];
+        }
+
+        convolutionOnHost(getData(), dataCopy, kernel, kernelSide, getWidth(), getHeight(),
+                          getChannels());
+    } else {
+        // Create a copy of the data on device.
+        cudaMalloc((unsigned char **) &dataCopy, _nBytes);
+        cudaMemcpy(dataCopy, getData(), _nBytes, cudaMemcpyDeviceToDevice);
+
+        // Copy kernel to device.
+        float *d_kernel;
+        cudaMalloc((float **) &d_kernel, kernelSide * kernelSide * sizeof(float));
+        cudaMemcpy(d_kernel, kernel, kernelSide * kernelSide * sizeof(float), cudaMemcpyHostToDevice);
+
+        int blockSize = 1024;
+        dim3 threads(blockSize, 1);
+        dim3 blocks((getSize() + threads.x - 1) / threads.x, 1);
+        convolutionOnDevice<<<blocks, threads>>>(getData(), dataCopy, d_kernel, kernelSide, getWidth(), getHeight(),
+                                                 getChannels());
+
+        // Free memory.
+        cudaFree(dataCopy);
+    }
+}
+
+
 void Image::transpose() {
     if (strcmp(_device, _validDevices[0]) == 0) {
         transposeOnHost(getData(), getWidth(), getHeight(), getChannels());

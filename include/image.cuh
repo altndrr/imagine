@@ -36,6 +36,8 @@ public:
 
     void setDevice(const char *device);
 
+    void convolution(float *kernel, int kernelSide);
+
     void transpose();
 
 private:
