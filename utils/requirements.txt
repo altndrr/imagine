@@ -3,3 +3,4 @@ numpy==1.20.1
 opencv-python==4.5.1.48
 pip==21.0.1
 setuptools==54.2.0
+tqdm==4.59.0
