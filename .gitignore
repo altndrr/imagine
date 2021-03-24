@@ -305,3 +305,5 @@ $RECYCLE.BIN/
 # End of https://www.toptal.com/developers/gitignore/api/c++,cuda,macos,linux,clion,windows,visualstudiocode,jetbrains
 
 imagine
+data/output.*
+data/*/*
