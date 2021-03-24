@@ -1,0 +1,5 @@
+docopt==0.6.2
+numpy==1.20.1
+opencv-python==4.5.1.48
+pip==21.0.1
+setuptools==54.2.0

@@ -307,3 +307,4 @@ $RECYCLE.BIN/
 imagine
 data/output.*
 data/*/*
+utils/venv
