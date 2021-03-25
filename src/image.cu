@@ -33,7 +33,26 @@ Image::Image(const char *filename) {
     stbi_image_free(data);
 }
 
-void Image::dispose() {
+Image::Image(const Image &obj) {
+    _device = obj._device;
+    _filename = obj._filename;
+    _width = obj._width;
+    _height = obj._height;
+    _channels = obj._channels;
+    _nBytes = _width * _height * _channels * sizeof(unsigned char);
+
+    // Allocate space for the host copy.
+    _h_data = (unsigned char *) malloc(_nBytes);
+    for (int i = 0; i < _width * _height * _channels; i++) {
+        _h_data[i] = obj._h_data[i];
+    }
+
+    // Allocate space for the cuda copy.
+    cudaMalloc((unsigned char **) &_d_data, _nBytes);
+    cudaMemcpy(_d_data, obj._d_data, _nBytes, cudaMemcpyDeviceToDevice);
+}
+
+Image::~Image(void) {
     free(_h_data);
     cudaFree(_d_data);
 }

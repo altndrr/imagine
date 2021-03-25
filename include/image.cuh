@@ -10,7 +10,9 @@ class Image {
 public:
     Image(const char *filename);
 
-    void dispose();
+    Image(const Image &obj);
+
+    ~Image(void);
 
     int getChannels();
 
