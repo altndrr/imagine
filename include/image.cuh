@@ -14,6 +14,8 @@ public:
 
     ~Image(void);
 
+    Image operator-(const Image &obj);
+
     int getChannels();
 
     unsigned char *getData();

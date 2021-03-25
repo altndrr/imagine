@@ -74,6 +74,37 @@ __global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src, floa
     }
 }
 
+void differenceOnHost(unsigned char *src, unsigned char *dst, const int width, const int height, const int channels) {
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            for (int c = 0; c < channels; c++) {
+                int i = channels * (y * width + x) + c;
+                if (dst[i] > src[i]) {
+                    dst[i] = dst[i] - src[i];
+                } else {
+                    dst[i] = src[i] - dst[i];
+                }
+            }
+        }
+    }
+}
+
+__global__ void differenceOnDevice(unsigned char *src, unsigned char *dst, const int width, const int height,
+                                   const int channels) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Check for overflow.
+    if (i >= width * height * channels) {
+        return;
+    }
+
+    if (dst[i] > src[i]) {
+        dst[i] = dst[i] - src[i];
+    } else {
+        dst[i] = src[i] - dst[i];
+    }
+}
+
 void histogramOnHost(unsigned char *src, unsigned char *dst, const int width, const int height, const int channels) {
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {

@@ -4,6 +4,7 @@
 #include "../libs/stb/stb_image.h"
 #include "../libs/stb/stb_image_write.h"
 #include <cuda_runtime.h>
+#include <stdexcept>
 
 Image::Image(const char *filename) {
     _filename = filename;
@@ -55,6 +56,27 @@ Image::Image(const Image &obj) {
 Image::~Image(void) {
     free(_h_data);
     cudaFree(_d_data);
+}
+
+Image Image::operator-(const Image &obj) {
+    // Return if images have different sizes.
+    if (_width != obj._width or _height != obj._height or _channels != obj._channels) {
+        throw std::invalid_argument("images have different sizes");
+    }
+
+    Image result(obj);
+    result.setDevice(_device);
+
+    if (strcmp(_device, _validDevices[0]) == 0) {
+        differenceOnHost(getData(), result.getData(), getWidth(), getHeight(), getChannels());
+    } else {
+        int blockSize = 1024;
+        dim3 threads(blockSize, 1);
+        dim3 blocks((getSize() + threads.x - 1) / threads.x, 1);
+        differenceOnDevice<<<blocks, threads>>>(getData(), result.getData(), getWidth(), getHeight(), getChannels());
+    }
+
+    return result;
 }
 
 int Image::getChannels() {
@@ -223,9 +245,9 @@ unsigned char *Image::histogram() {
 
 
 void Image::transpose() {
-    // Transpose only when width equals height.
+    // Return if width and height are different.
     if (getWidth() != getHeight()) {
-        return;
+        throw std::invalid_argument("width and height must have the same size");
     }
 
     if (strcmp(_device, _validDevices[0]) == 0) {
