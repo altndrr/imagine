@@ -38,6 +38,8 @@ public:
 
     void convolution(float *kernel, int kernelSide);
 
+    unsigned char *histogram();
+
     void transpose();
 
 private:

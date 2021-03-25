@@ -4,6 +4,8 @@
 #include "stdio.h"
 #include <string>
 
+const int PIXEL_VALUES = 256;
+
 bool arrayContains(char **list, std::string word);
 
 bool arrayContains(const char **list, std::string word);

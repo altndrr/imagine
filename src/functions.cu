@@ -1,4 +1,5 @@
 #include "../include/functions.cuh"
+#include "../include/common.h"
 
 void convolutionOnHost(unsigned char *dst, unsigned char *src, float *kernel, int kernelSide,
                        const int width, const int height, const int channels) {
@@ -68,6 +69,42 @@ __global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src, floa
 
                 // Add result of multiplication.
                 dst[dst_i] += int(src[src_i] * kernel[ker_i]);
+            }
+        }
+    }
+}
+
+void histogramOnHost(unsigned char *src, unsigned char *dst, const int width, const int height, const int channels) {
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            for (int c = 0; c < channels; c++) {
+                int ia = channels * (y * width + x) + c;
+                int ib = PIXEL_VALUES * c + int(src[ia]);
+
+                dst[ib] += 1;
+            }
+        }
+    }
+}
+
+__global__ void histogramOnDevice(unsigned char *src, unsigned char *dst, const int width, const int height,
+                                  const int channels) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Check for overflow.
+    if (i > PIXEL_VALUES * channels) {
+        return;
+    }
+
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            for (int c = 0; c < channels; c++) {
+                int ia = channels * (y * width + x) + c;
+                int ib = PIXEL_VALUES * c + int(src[ia]);
+
+                if (ib == i) {
+                    dst[i] += 1;
+                }
             }
         }
     }
