@@ -110,7 +110,7 @@ int Image::getHeight() {
 }
 
 int Image::getSize() {
-    return _height * _width;
+    return _width * _height * _channels;
 }
 
 int Image::getWidth() {
@@ -123,7 +123,7 @@ bool Image::isSynchronized() {
 
     float epsilon = 1.0E-8;
     int match = 1;
-    for (int i = 0; i < getSize() * getChannels(); i++) {
+    for (int i = 0; i < getSize(); i++) {
         if (abs(_h_data[i] - h_d_data_copy[i]) > epsilon) {
             match = 0;
             break;
@@ -165,7 +165,7 @@ void Image::convolution(float *kernel, int kernelSide) {
     if (strcmp(_device, _validDevices[0]) == 0) {
         // Create a copy of the data on host.
         dataCopy = (unsigned char *) malloc(_nBytes);
-        for (int i = 0; i < getSize() * getChannels(); i++) {
+        for (int i = 0; i < getSize(); i++) {
             dataCopy[i] = getData()[i];
         }
 
@@ -183,7 +183,7 @@ void Image::convolution(float *kernel, int kernelSide) {
 
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
-        dim3 blocks((getSize() + threads.x - 1) / threads.x, 1);
+        dim3 blocks((getWidth() * getHeight() + threads.x - 1) / threads.x, 1);
         convolutionOnDevice<<<blocks, threads>>>(getData(), dataCopy, d_kernel, kernelSide, getWidth(), getHeight(),
                                                  getChannels());
 
@@ -223,12 +223,17 @@ unsigned char *Image::histogram() {
 
 
 void Image::transpose() {
+    // Transpose only when width equals height.
+    if (getWidth() != getHeight()) {
+        return;
+    }
+
     if (strcmp(_device, _validDevices[0]) == 0) {
         transposeOnHost(getData(), getWidth(), getHeight(), getChannels());
     } else {
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
-        dim3 blocks((getSize() + threads.x - 1) / threads.x, 1);
+        dim3 blocks((getWidth() * getHeight() + threads.x - 1) / threads.x, 1);
         transposeOnDevice<<<blocks, threads>>>(getData(), getWidth(), getHeight(), getChannels());
     }
 }
