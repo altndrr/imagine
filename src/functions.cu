@@ -74,7 +74,7 @@ __global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src, floa
     }
 }
 
-void differenceOnHost(unsigned char *src, unsigned char *dst, const int width, const int height, const int channels) {
+void differenceOnHost(unsigned char *dst, unsigned char *src, const int width, const int height, const int channels) {
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             for (int c = 0; c < channels; c++) {
@@ -89,7 +89,7 @@ void differenceOnHost(unsigned char *src, unsigned char *dst, const int width, c
     }
 }
 
-__global__ void differenceOnDevice(unsigned char *src, unsigned char *dst, const int width, const int height,
+__global__ void differenceOnDevice(unsigned char *dst, unsigned char *src, const int width, const int height,
                                    const int channels) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -105,7 +105,7 @@ __global__ void differenceOnDevice(unsigned char *src, unsigned char *dst, const
     }
 }
 
-void histogramOnHost(unsigned char *src, unsigned char *dst, const int width, const int height, const int channels) {
+void histogramOnHost(unsigned char *dst, unsigned char *src, const int width, const int height, const int channels) {
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             for (int c = 0; c < channels; c++) {
@@ -118,7 +118,7 @@ void histogramOnHost(unsigned char *src, unsigned char *dst, const int width, co
     }
 }
 
-__global__ void histogramOnDevice(unsigned char *src, unsigned char *dst, const int width, const int height,
+__global__ void histogramOnDevice(unsigned char *dst, unsigned char *src, const int width, const int height,
                                   const int channels) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 

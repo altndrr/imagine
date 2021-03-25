@@ -68,12 +68,12 @@ Image Image::operator-(const Image &obj) {
     result.setDevice(_device);
 
     if (strcmp(_device, _validDevices[0]) == 0) {
-        differenceOnHost(getData(), result.getData(), getWidth(), getHeight(), getChannels());
+        differenceOnHost(result.getData(), getData(), getWidth(), getHeight(), getChannels());
     } else {
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
         dim3 blocks((getSize() + threads.x - 1) / threads.x, 1);
-        differenceOnDevice<<<blocks, threads>>>(getData(), result.getData(), getWidth(), getHeight(), getChannels());
+        differenceOnDevice<<<blocks, threads>>>(result.getData(), getData(), getWidth(), getHeight(), getChannels());
     }
 
     return result;
@@ -223,7 +223,7 @@ unsigned char *Image::histogram() {
     }
 
     if (strcmp(_device, _validDevices[0]) == 0) {
-        histogramOnHost(getData(), histogram, getWidth(), getHeight(), getChannels());
+        histogramOnHost(histogram, getData(), getWidth(), getHeight(), getChannels());
     } else {
         // Copy histogram to device.
         unsigned char *d_histogram;
@@ -233,7 +233,7 @@ unsigned char *Image::histogram() {
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
         dim3 blocks((getSize() + threads.x - 1) / threads.x, 1);
-        histogramOnDevice<<<blocks, threads>>>(getData(), d_histogram, getWidth(), getHeight(), getChannels());
+        histogramOnDevice<<<blocks, threads>>>(d_histogram, getData(), getWidth(), getHeight(), getChannels());
 
         // Copy result to host.
         cudaMemcpy(histogram, d_histogram, histBytes, cudaMemcpyDeviceToHost);
