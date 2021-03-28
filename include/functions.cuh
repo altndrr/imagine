@@ -19,6 +19,12 @@ void histogramOnHost(unsigned char *dst, unsigned char *src, const int width, co
 __global__ void histogramOnDevice(unsigned char *dst, unsigned char *src, const int width, const int height,
                                   const int channels);
 
+void rotateOnHost(unsigned char *dst, unsigned char *src, const double radian, const int width, const int height,
+                  const int channels);
+
+__global__ void rotateOnDevice(unsigned char *dst, unsigned char *src, const double radian, const int width,
+                               const int height, const int channels);
+
 void transposeOnHost(unsigned char *data, const int width, const int height, const int channels);
 
 __global__ void transposeOnDevice(unsigned char *data, const int width, const int height, const int channels);

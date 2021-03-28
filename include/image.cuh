@@ -44,6 +44,8 @@ public:
 
     unsigned char *histogram();
 
+    void rotate(double degree);
+
     void transpose();
 
 private:

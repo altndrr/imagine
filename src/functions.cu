@@ -1,5 +1,6 @@
 #include "../include/functions.cuh"
 #include "../include/common.h"
+#include <cmath>
 
 void convolutionOnHost(unsigned char *dst, unsigned char *src, float *kernel, int kernelSide,
                        const int width, const int height, const int channels) {
@@ -138,6 +139,108 @@ __global__ void histogramOnDevice(unsigned char *dst, unsigned char *src, const 
                 }
             }
         }
+    }
+}
+
+void rotateOnHost(unsigned char *dst, unsigned char *src, const double radian, const int width, const int height,
+                  const int channels) {
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            // Evaluate the source pixels.
+            int x_center = x - round(width / 2.0);
+            int y_center = y - round(height / 2.0);
+            double xa = x_center * cos(-radian) - y_center * sin(-radian) + round(width / 2.0);
+            double ya = x_center * sin(-radian) + y_center * cos(-radian) + round(height / 2.0);
+
+            // Check for out-of-bound coordinates.
+            if (xa < 0 or xa > width or ya < 0 or ya > height) {
+                // Set pixels to black and exit
+                for (int c = 0; c < channels; c++) {
+                    int ib = channels * (y * width + x) + c;
+                    dst[ib] = 0;
+                }
+
+                continue;
+            }
+
+            for (int c = 0; c < channels; c++) {
+                int ib = channels * (y * width + x) + c;
+
+                // Evaluate the four pixels given xs and ys roundings.
+                int ia[4] = {
+                        channels * (int(floor(ya)) * width + int(floor(xa))) + c,
+                        channels * (int(floor(ya)) * width + int(ceil(xa))) + c,
+                        channels * (int(ceil(ya)) * width + int(floor(xa))) + c,
+                        channels * (int(ceil(ya)) * width + int(ceil(xa))) + c
+                };
+
+                // Evaluate the average value of the destination pixel.
+                float sum = 0.0;
+                int count = 0;
+                for (int k = 0; k < 4; k++) {
+                    if (0 <= ia[k] and ia[k] <= width * height * channels) {
+                        sum += src[ia[k]];
+                        count++;
+                    }
+                }
+
+                dst[ib] = int(sum / count);
+            }
+        }
+    }
+}
+
+__global__ void rotateOnDevice(unsigned char *dst, unsigned char *src, const double radian, const int width,
+                               const int height, const int channels) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Check for overflow.
+    if (i >= width * height) {
+        return;
+    }
+
+    int x = (i % width);
+    int y = (int) i / width;
+
+    // Evaluate the source pixels.
+    int x_center = x - round(width / 2.0);
+    int y_center = y - round(height / 2.0);
+    double xa = x_center * cos(-radian) - y_center * sin(-radian) + round(width / 2.0);
+    double ya = x_center * sin(-radian) + y_center * cos(-radian) + round(height / 2.0);
+
+    // Check for out-of-bound coordinates.
+    if (xa < 0 or xa > width or ya < 0 or ya > height) {
+        // Set pixels to black and exit
+        for (int c = 0; c < channels; c++) {
+            int ib = channels * (y * width + x) + c;
+            dst[ib] = 0;
+        }
+
+        return;
+    }
+
+    for (int c = 0; c < channels; c++) {
+        int ib = channels * (y * width + x) + c;
+
+        // Evaluate the four pixels given xs and ys roundings.
+        int ia[4] = {
+                channels * (int(floor(ya)) * width + int(floor(xa))) + c,
+                channels * (int(floor(ya)) * width + int(ceil(xa))) + c,
+                channels * (int(ceil(ya)) * width + int(floor(xa))) + c,
+                channels * (int(ceil(ya)) * width + int(ceil(xa))) + c
+        };
+
+        // Evaluate the average value of the destination pixel.
+        float sum = 0.0;
+        int count = 0;
+        for (int k = 0; k < 4; k++) {
+            if (0 <= ia[k] and ia[k] <= width * height * channels) {
+                sum += src[ia[k]];
+                count++;
+            }
+        }
+
+        dst[ib] = int(sum / count);
     }
 }
 

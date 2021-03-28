@@ -243,6 +243,29 @@ unsigned char *Image::histogram() {
     return histogram;
 }
 
+void Image::rotate(double degree) {
+    double rad = degree * (M_PI / 180);
+    unsigned char *dataCopy;
+
+    if (strcmp(_device, _validDevices[0]) == 0) {
+        // Create a copy of the data on host.
+        dataCopy = (unsigned char *) malloc(_nBytes);
+        for (int i = 0; i < getSize(); i++) {
+            dataCopy[i] = getData()[i];
+        }
+
+        rotateOnHost(getData(), dataCopy, rad, getWidth(), getHeight(), getChannels());
+    } else {
+        // Copy histogram to device.
+        cudaMalloc((unsigned char **) &dataCopy, _nBytes);
+        cudaMemcpy(dataCopy, _d_data, _nBytes, cudaMemcpyDeviceToDevice);
+
+        int blockSize = 1024;
+        dim3 threads(blockSize, 1);
+        dim3 blocks((getWidth() * getHeight() + threads.x - 1) / threads.x, 1);
+        rotateOnDevice<<<blocks, threads>>>(getData(), dataCopy, rad, getWidth(), getHeight(), getChannels());
+    }
+}
 
 void Image::transpose() {
     // Return if width and height are different.
