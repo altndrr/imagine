@@ -223,6 +223,24 @@ void Image::convolution(float *kernel, int kernelSide) {
     }
 }
 
+void Image::drawPoint(int x, int y, int radius, int *color, int colorSize) {
+    if (strcmp(_device, _validDevices[0]) == 0) {
+        drawPointOnHost(getData(), x, y, radius, color, colorSize, getWidth(), getHeight(), getChannels());
+    } else {
+        int blockSize = 1024;
+        dim3 threads(blockSize, 1);
+        dim3 blocks((getWidth() * getHeight() + threads.x - 1) / threads.x, 1);
+
+        size_t colorBytes = colorSize * sizeof(int);
+        int *d_color;
+        cudaMalloc((int **) &d_color, colorBytes);
+        cudaMemcpy(d_color, color, colorBytes, cudaMemcpyHostToDevice);
+
+        drawPointOnDevice<<<blocks, threads>>>(getData(), x, y, radius, d_color, colorSize, getWidth(), getHeight(),
+                                               getChannels());
+    }
+}
+
 unsigned char *Image::histogram() {
     size_t histBytes = PIXEL_VALUES * getChannels() * sizeof(unsigned char);
     unsigned char *histogram = (unsigned char *) malloc(histBytes);

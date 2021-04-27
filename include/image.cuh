@@ -44,6 +44,8 @@ public:
 
     void convolution(float *kernel, int kernelSide);
 
+    void drawPoint(int x, int y, int radius, int *color, int colorSize);
+
     unsigned char *histogram();
 
     void rotate(double degree);

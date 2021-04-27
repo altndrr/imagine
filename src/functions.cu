@@ -75,6 +75,42 @@ __global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src, floa
     }
 }
 
+void drawPointOnHost(unsigned char *data, int x, int y, int radius, int *color, int colorSize, int width, int height,
+                     int channels) {
+    for (int dy = max(0, y - radius); dy < y + radius; dy++) {
+        for (int dx = max(0, x - radius); dx < x + radius; dx++) {
+            int index = (dx * width + dy) * channels;
+
+            for (int c = 0; c < min(channels, colorSize); c++) {
+                data[index + c] = color[c];
+            }
+        }
+    }
+}
+
+__global__ void drawPointOnDevice(unsigned char *data, int x, int y, int radius, int *color, int colorSize, int width,
+                                  int height, int channels) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Check for overflow.
+    if (i >= width * height) {
+        return;
+    }
+
+    int dx = (int) i / width;
+    int dy = (i % width);
+
+    // Check for point boundaries.
+    if (dy < y - radius or dy >= y + radius or dx < x - radius or dx >= x + radius) {
+        return;
+    }
+
+    for (int c = 0; c < min(channels, colorSize); c++) {
+        int index = channels * i;
+        data[index + c] = color[c];
+    }
+}
+
 void differenceOnHost(unsigned char *dst, unsigned char *src, const int width, const int height, const int channels) {
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
