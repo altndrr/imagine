@@ -6,11 +6,16 @@
 #include <cuda_runtime.h>
 #include <stdexcept>
 
-Image::Image(const char *filename) {
+Image::Image(const char *filename, bool grayscale) {
     _filename = filename;
 
+    int desiredChannels = 3;
+    if (grayscale) {
+        desiredChannels = 1;
+    }
+
     int w, h, c;
-    unsigned char *data = stbi_load(_filename, &w, &h, &c, 3);
+    unsigned char *data = stbi_load(_filename, &w, &h, &c, desiredChannels);
 
     if (!data) {
         return;
@@ -18,13 +23,13 @@ Image::Image(const char *filename) {
 
     _width = w;
     _height = h;
-    _channels = c;
+    _channels = desiredChannels;
 
-    _nBytes = w * h * c * sizeof(unsigned char);
+    _nBytes = w * h * desiredChannels * sizeof(unsigned char);
 
     // Allocate space for the host copy.
     _h_data = (unsigned char *) malloc(_nBytes);
-    for (int i = 0; i < w * h * c; i++) {
+    for (int i = 0; i < w * h * desiredChannels; i++) {
         _h_data[i] = data[i];
     }
 
@@ -32,6 +37,10 @@ Image::Image(const char *filename) {
     cudaMalloc((unsigned char **) &_d_data, _nBytes);
 
     stbi_image_free(data);
+}
+
+Image::Image(const char *filename) : Image(filename, false) {
+    ;
 }
 
 Image::Image(const Image &obj) {
