@@ -45,8 +45,8 @@ __global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src, floa
 
     unsigned int margin = int((kernelSide - 1) / 2);
 
-    int x = (i % width);
-    int y = (int) i / width;
+    int x = (int) i / width;
+    int y = (i % width);
 
     // Check for minimum padding.
     if (y < margin or y > height - margin - 1 or x < margin or x > width - margin - 1) {
@@ -59,8 +59,8 @@ __global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src, floa
 
             // Loop through the channels of the image.
             for (int c = 0; c < channels; c++) {
-                int src_i = channels * ((y + (dy - margin)) * width + (x + (dx - margin))) + c;
-                int ker_i = dy * kernelSide + dx;
+                int src_i = channels * ((x + (dx - margin)) * width + (y + (dy - margin))) + c;
+                int ker_i = dx * kernelSide + dy;
                 int dst_i = channels * i + c;
 
                 // Reset dst element at the start of the conv.
@@ -199,8 +199,8 @@ __global__ void rotateOnDevice(unsigned char *dst, unsigned char *src, const dou
         return;
     }
 
-    int x = (i % width);
-    int y = (int) i / width;
+    int x = (int) i / width;
+    int y = (i % width);
 
     // Evaluate the source pixels.
     int x_center = x - round(width / 2.0);
