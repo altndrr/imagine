@@ -14,7 +14,7 @@ OBJ_DIR = bin
 SRC_DIR = src
 INC_DIR = include
 
-OBJS = $(OBJ_DIR)/main.o $(OBJ_DIR)/common.o $(OBJ_DIR)/functions.o $(OBJ_DIR)/image.o
+OBJS = $(OBJ_DIR)/main.o $(OBJ_DIR)/common.o $(OBJ_DIR)/functions.o $(OBJ_DIR)/image.o $(OBJ_DIR)/kernel.o
 
 # Link c++ and CUDA compiled object files to target executable:
 $(PROJECT_NAME) : $(OBJS)
