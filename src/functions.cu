@@ -7,8 +7,8 @@ void convolutionOnHost(unsigned char *dst, unsigned char *src, float *kernel, in
     unsigned int margin = int((kernelSide - 1) / 2);
 
     // Loop through each pixel.
-    for (int y = margin; y < height - margin; y++) {
-        for (int x = margin; x < width - margin; x++) {
+    for (int y = margin; y < width - margin; y++) {
+        for (int x = margin; x < height - margin; x++) {
 
             // Loop through each element of the kernel.
             for (int dy = 0; dy < kernelSide; dy++) {
@@ -16,9 +16,9 @@ void convolutionOnHost(unsigned char *dst, unsigned char *src, float *kernel, in
 
                     // Loop through the channels of the image.
                     for (int c = 0; c < channels; c++) {
-                        int src_i = channels * ((y + (dy - margin)) * width + (x + (dx - margin))) + c;
-                        int ker_i = dy * kernelSide + dx;
-                        int dst_i = channels * (y * width + x) + c;
+                        int src_i = channels * ((x + (dx - margin)) * width + (y + (dy - margin))) + c;
+                        int ker_i = dx * kernelSide + dy;
+                        int dst_i = channels * (x * width + y) + c;
 
                         // Reset dst element at the start of the conv.
                         if (ker_i == 0) {
@@ -49,7 +49,7 @@ __global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src, floa
     int y = (i % width);
 
     // Check for minimum padding.
-    if (y < margin or y > height - margin - 1 or x < margin or x > width - margin - 1) {
+    if (y < margin or y > width - margin - 1 or x < margin or x > height - margin - 1) {
         return;
     }
 
@@ -82,7 +82,9 @@ void drawPointOnHost(unsigned char *data, int x, int y, int radius, int *color, 
             int index = (dx * width + dy) * channels;
 
             for (int c = 0; c < min(channels, colorSize); c++) {
-                data[index + c] = color[c];
+                if (index + c < width * height * channels) {
+                    data[index + c] = color[c];
+                }
             }
         }
     }
@@ -107,15 +109,17 @@ __global__ void drawPointOnDevice(unsigned char *data, int x, int y, int radius,
 
     for (int c = 0; c < min(channels, colorSize); c++) {
         int index = channels * i;
-        data[index + c] = color[c];
+        if (index + c < width * height * channels) {
+            data[index + c] = color[c];
+        }
     }
 }
 
 void differenceOnHost(unsigned char *dst, unsigned char *src, const int width, const int height, const int channels) {
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
+    for (int y = 0; y < width; y++) {
+        for (int x = 0; x < height; x++) {
             for (int c = 0; c < channels; c++) {
-                int i = channels * (y * width + x) + c;
+                int i = channels * (x * width + y) + c;
                 if (dst[i] > src[i]) {
                     dst[i] = dst[i] - src[i];
                 } else {
@@ -143,8 +147,8 @@ __global__ void differenceOnDevice(unsigned char *dst, unsigned char *src, const
 }
 
 void histogramOnHost(unsigned char *dst, unsigned char *src, const int width, const int height, const int channels) {
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
+    for (int y = 0; y < width; y++) {
+        for (int x = 0; x < height; x++) {
             for (int c = 0; c < channels; c++) {
                 int ia = channels * (y * width + x) + c;
                 int ib = PIXEL_VALUES * c + int(src[ia]);
@@ -164,8 +168,8 @@ __global__ void histogramOnDevice(unsigned char *dst, unsigned char *src, const 
         return;
     }
 
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
+    for (int y = 0; y < width; y++) {
+        for (int x = 0; x < height; x++) {
             for (int c = 0; c < channels; c++) {
                 int ia = channels * (y * width + x) + c;
                 int ib = PIXEL_VALUES * c + int(src[ia]);
@@ -180,19 +184,19 @@ __global__ void histogramOnDevice(unsigned char *dst, unsigned char *src, const 
 
 void rotateOnHost(unsigned char *dst, unsigned char *src, const double radian, const int width, const int height,
                   const int channels) {
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
+    for (int y = 0; y < width; y++) {
+        for (int x = 0; x < height; x++) {
             // Evaluate the source pixels.
-            int x_center = x - round(width / 2.0);
-            int y_center = y - round(height / 2.0);
-            double xa = x_center * cos(-radian) - y_center * sin(-radian) + round(width / 2.0);
-            double ya = x_center * sin(-radian) + y_center * cos(-radian) + round(height / 2.0);
+            int x_center = x - round(height / 2.0);
+            int y_center = y - round(width / 2.0);
+            double xa = x_center * cos(-radian) - y_center * sin(-radian) + round(height / 2.0);
+            double ya = x_center * sin(-radian) + y_center * cos(-radian) + round(width / 2.0);
 
             // Check for out-of-bound coordinates.
-            if (xa < 0 or xa > width or ya < 0 or ya > height) {
+            if (xa < 0 or xa > height or ya < 0 or ya > width) {
                 // Set pixels to black and exit
                 for (int c = 0; c < channels; c++) {
-                    int ib = channels * (y * width + x) + c;
+                    int ib = channels * (x * width + y) + c;
                     dst[ib] = 0;
                 }
 
@@ -200,14 +204,14 @@ void rotateOnHost(unsigned char *dst, unsigned char *src, const double radian, c
             }
 
             for (int c = 0; c < channels; c++) {
-                int ib = channels * (y * width + x) + c;
+                int ib = channels * (x * width + y) + c;
 
                 // Evaluate the four pixels given xs and ys roundings.
                 int ia[4] = {
-                        channels * (int(floor(ya)) * width + int(floor(xa))) + c,
-                        channels * (int(floor(ya)) * width + int(ceil(xa))) + c,
-                        channels * (int(ceil(ya)) * width + int(floor(xa))) + c,
-                        channels * (int(ceil(ya)) * width + int(ceil(xa))) + c
+                        channels * (int(floor(xa)) * width + int(floor(ya))) + c,
+                        channels * (int(floor(xa)) * width + int(ceil(ya))) + c,
+                        channels * (int(ceil(xa)) * width + int(floor(ya))) + c,
+                        channels * (int(ceil(xa)) * width + int(ceil(ya))) + c
                 };
 
                 // Evaluate the average value of the destination pixel.
@@ -239,16 +243,16 @@ __global__ void rotateOnDevice(unsigned char *dst, unsigned char *src, const dou
     int y = (i % width);
 
     // Evaluate the source pixels.
-    int x_center = x - round(width / 2.0);
-    int y_center = y - round(height / 2.0);
-    double xa = x_center * cos(-radian) - y_center * sin(-radian) + round(width / 2.0);
-    double ya = x_center * sin(-radian) + y_center * cos(-radian) + round(height / 2.0);
+    int x_center = x - round(height / 2.0);
+    int y_center = y - round(width / 2.0);
+    double xa = x_center * cos(-radian) - y_center * sin(-radian) + round(height / 2.0);
+    double ya = x_center * sin(-radian) + y_center * cos(-radian) + round(width / 2.0);
 
     // Check for out-of-bound coordinates.
-    if (xa < 0 or xa > width or ya < 0 or ya > height) {
+    if (xa < 0 or xa > height or ya < 0 or ya > width) {
         // Set pixels to black and exit
         for (int c = 0; c < channels; c++) {
-            int ib = channels * (y * width + x) + c;
+            int ib = channels * (x * width + y) + c;
             dst[ib] = 0;
         }
 
@@ -256,14 +260,14 @@ __global__ void rotateOnDevice(unsigned char *dst, unsigned char *src, const dou
     }
 
     for (int c = 0; c < channels; c++) {
-        int ib = channels * (y * width + x) + c;
+        int ib = channels * (x * width + y) + c;
 
         // Evaluate the four pixels given xs and ys roundings.
         int ia[4] = {
-                channels * (int(floor(ya)) * width + int(floor(xa))) + c,
-                channels * (int(floor(ya)) * width + int(ceil(xa))) + c,
-                channels * (int(ceil(ya)) * width + int(floor(xa))) + c,
-                channels * (int(ceil(ya)) * width + int(ceil(xa))) + c
+                channels * (int(floor(xa)) * width + int(floor(ya))) + c,
+                channels * (int(floor(xa)) * width + int(ceil(ya))) + c,
+                channels * (int(ceil(xa)) * width + int(floor(ya))) + c,
+                channels * (int(ceil(xa)) * width + int(ceil(ya))) + c
         };
 
         // Evaluate the average value of the destination pixel.
@@ -281,8 +285,8 @@ __global__ void rotateOnDevice(unsigned char *dst, unsigned char *src, const dou
 }
 
 void transposeOnHost(unsigned char *data, const int width, const int height, const int channels) {
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
+    for (int y = 0; y < width; y++) {
+        for (int x = 0; x < height; x++) {
             for (int c = 0; c < channels; c++) {
                 int ia = channels * (y * width + x) + c;
                 int ib = channels * (x * height + y) + c;
