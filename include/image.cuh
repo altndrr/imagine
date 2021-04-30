@@ -46,6 +46,8 @@ public:
 
     void drawPoint(int x, int y, int radius, int *color, int colorSize);
 
+    void goodFeaturesToTrack(int *corners, int maxCorners, float qualityLevel, float minDistance);
+
     unsigned char *histogram();
 
     void rotate(double degree);

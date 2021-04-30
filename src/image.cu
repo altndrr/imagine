@@ -1,6 +1,7 @@
 #include "../include/image.cuh"
 #include "../include/common.h"
 #include "../include/functions.cuh"
+#include "../include/kernel.h"
 #include "../libs/stb/stb_image.h"
 #include "../libs/stb/stb_image_write.h"
 #include <cuda_runtime.h>
@@ -238,6 +239,25 @@ void Image::drawPoint(int x, int y, int radius, int *color, int colorSize) {
 
         drawPointOnDevice<<<blocks, threads>>>(getData(), x, y, radius, d_color, colorSize, getWidth(), getHeight(),
                                                getChannels());
+    }
+}
+
+void Image::goodFeaturesToTrack(int *corners, int maxCorners, float qualityLevel, float minDistance) {
+    Image gradX(getFilename(), true);
+    Image gradY(getFilename(), true);
+    gradX.setDevice(getDevice());
+    gradY.setDevice(getDevice());
+
+    int side;
+    float *sobelX, *sobelY;
+    Kernel::SobelX(&sobelX, &side);
+    Kernel::SobelY(&sobelY);
+    gradX.convolution(sobelX, side);
+    gradY.convolution(sobelY, side);
+
+    if (strcmp(_device, _validDevices[0]) == 0) {
+        goodFeaturesToTrackOnHost(gradX.getData(), gradY.getData(), corners, maxCorners, qualityLevel, minDistance,
+                                  getWidth(), getHeight());
     }
 }
 
