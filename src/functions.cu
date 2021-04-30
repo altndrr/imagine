@@ -325,3 +325,23 @@ __global__ void transposeOnDevice(unsigned char *data, const int width, const in
         data[ia] = temp;
     }
 }
+
+void sumOfMatmulOnHost(float *total, float *A, float *B, int side) {
+    float *C = new float[side * side];
+    *total = 0;
+
+    for (int i = 0; i < side * side; i++) {
+        int x = (int) i / side;
+        int y = (i % side);
+
+        C[i] = 0;
+        for (int d = 0; d < side; d++) {
+            int ia = x * side + d;
+            int ib = d * side + y;
+
+            C[i] += A[ia] * B[ib];
+        }
+
+        *total += C[i];
+    }
+}

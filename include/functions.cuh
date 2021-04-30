@@ -35,5 +35,6 @@ void transposeOnHost(unsigned char *data, const int width, const int height, con
 
 __global__ void transposeOnDevice(unsigned char *data, const int width, const int height, const int channels);
 
+void sumOfMatmulOnHost(float *total, float *A, float *B, int side);
 
 #endif //IMAGINE_FUNCTIONS_H
