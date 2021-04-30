@@ -5,6 +5,7 @@
 #include "../libs/stb/stb_image.h"
 #include "../libs/stb/stb_image_write.h"
 #include <cuda_runtime.h>
+#include <queue>
 #include <stdexcept>
 
 Image::Image(const char *filename, bool grayscale) {
@@ -255,9 +256,75 @@ void Image::goodFeaturesToTrack(int *corners, int maxCorners, float qualityLevel
     gradX.convolution(sobelX, side);
     gradY.convolution(sobelY, side);
 
+    int scoreSize = getWidth() * getHeight();
+    float *scoreMatrix = new float[scoreSize];
+
     if (strcmp(_device, _validDevices[0]) == 0) {
-        goodFeaturesToTrackOnHost(gradX.getData(), gradY.getData(), corners, maxCorners, qualityLevel, minDistance,
-                                  getWidth(), getHeight());
+        cornerScoreOnHost(gradX.getData(), gradY.getData(), scoreMatrix, getWidth(), getHeight());
+    } else {
+        // Copy corner array to device.
+        size_t scoreMatrixBytes = scoreSize * sizeof(float);
+        float *d_scoreMatrix;
+        cudaMalloc((float **) &d_scoreMatrix, scoreMatrixBytes);
+        cudaMemcpy(d_scoreMatrix, scoreMatrix, scoreMatrixBytes, cudaMemcpyHostToDevice);
+
+        int blockSize = 1024;
+        dim3 threads(blockSize, 1);
+        dim3 blocks((scoreSize + threads.x - 1) / threads.x, 1);
+        cornerScoreOnDevice<<<blocks, threads>>>(gradX.getData(), gradY.getData(), d_scoreMatrix, getWidth(),
+                                                 getHeight());
+
+        // Copy result to host.
+        cudaMemcpy(scoreMatrix, d_scoreMatrix, scoreMatrixBytes, cudaMemcpyDeviceToHost);
+        cudaFree(d_scoreMatrix);
+    }
+
+    // Create a priority queue of the scores and store the highest score.
+    std::priority_queue <std::pair<float, int>> qR;
+    float strongestScore = 0.00;
+    for (int i = 0; i < scoreSize; i++) {
+        qR.push(std::pair<float, int>(scoreMatrix[i], i));
+        if (strongestScore < scoreMatrix[i]) {
+            strongestScore = scoreMatrix[i];
+        }
+    }
+
+    // Extract the top-K corners.
+    float threshold = strongestScore * qualityLevel;
+    for (int i = 0; i < maxCorners; ++i) {
+        corners[i] = -1;
+        float kValue;
+        int kIndex;
+        bool isDistant;
+
+        do {
+            kValue = qR.top().first;
+            kIndex = qR.top().second;
+            isDistant = true;
+
+            // Evaluate the Euclidean distance to the previous corners.
+            int j = 0;
+            while (j < i and isDistant) {
+                int otherIndex = corners[j];
+                int dx = ((int) otherIndex / getWidth()) - ((int) kIndex / getWidth());
+                int dy = (otherIndex % getWidth()) - (kIndex % getWidth());
+                int dist = sqrt(pow(dx, 2) + pow(dy, 2));
+
+                isDistant = dist > minDistance;
+                j++;
+            }
+
+            if (isDistant) {
+                // Add only if score is high enough.
+                if (kValue >= threshold) {
+                    corners[i] = kIndex;
+                } else {
+                    corners[i] = -1;
+                }
+            }
+
+            qR.pop();
+        } while (not isDistant and kValue < threshold);
     }
 }
 

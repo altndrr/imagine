@@ -20,8 +20,9 @@ void differenceOnHost(unsigned char *dst, unsigned char *src, const int width, c
 __global__ void differenceOnDevice(unsigned char *dst, unsigned char *src, const int width, const int height,
                                    const int channels);
 
-void goodFeaturesToTrackOnHost(unsigned char *gradX, unsigned char *gradY, int *corners, int maxCorners,
-                               float qualityLevel, float minDistance, int width, int height);
+void cornerScoreOnHost(unsigned char *gradX, unsigned char *gradY, float *R, int width, int height);
+
+__global__ void cornerScoreOnDevice(unsigned char *gradX, unsigned char *gradY, float *R, int width, int height);
 
 void histogramOnHost(unsigned char *dst, unsigned char *src, const int width, const int height, const int channels);
 

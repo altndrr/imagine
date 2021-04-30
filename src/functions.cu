@@ -1,7 +1,6 @@
 #include "../include/functions.cuh"
 #include "../include/common.h"
 #include <cmath>
-#include <queue>
 
 void convolutionOnHost(unsigned char *dst, unsigned char *src, float *kernel, int kernelSide,
                        const int width, const int height, const int channels) {
@@ -147,27 +146,23 @@ __global__ void differenceOnDevice(unsigned char *dst, unsigned char *src, const
     }
 }
 
-void goodFeaturesToTrackOnHost(unsigned char *gradX, unsigned char *gradY, int *corners, int maxCorners,
-                               float qualityLevel, float minDistance, int width, int height) {
-    int windowSide = 3;
-    int windowMargin = int((windowSide - 1) / 2);
-    int imageDim = width * height;
-    float *R = new float[imageDim];
-    std::priority_queue <std::pair<float, int>> qR;
+void cornerScoreOnHost(unsigned char *gradX, unsigned char *gradY, float *R, int width, int height) {
+    const int windowSide = 3;
+    const int windowMargin = int((windowSide - 1) / 2);
 
-    float strongestScore = 0.00;
-    for (int i = 0; i < imageDim; i++) {
+    for (int i = 0; i < width * height; i++) {
         int x = (int) i / width;
         int y = (i % width);
 
-        // Skip borders.
+        // Check for out-of-bound coordinates.
         R[i] = 0;
         if (x < windowMargin or y < windowMargin or x > height - windowMargin - 1 or y > width - windowMargin - 1) {
             continue;
         }
 
         // Create the windows Ix and Iy.
-        float Ix[windowSide * windowSide], Iy[windowSide * windowSide];
+        float *Ix = new float[windowSide * windowSide];
+        float *Iy = new float[windowSide * windowSide];
         for (int wi = 0; wi < windowSide * windowSide; wi++) {
             int dx = ((int) wi / windowSide) - windowMargin;
             int dy = (wi % windowSide) - windowMargin;
@@ -188,52 +183,57 @@ void goodFeaturesToTrackOnHost(unsigned char *gradX, unsigned char *gradY, int *
         float lambda1 = ((M[0] + M[3]) + sqrt(pow(-M[0] - M[3], 2) - 4 * (M[0] * M[3] - M[1] * M[2]))) / 2;
         float lambda2 = ((M[0] + M[3]) - sqrt(pow(-M[0] - M[3], 2) - 4 * (M[0] * M[3] - M[1] * M[2]))) / 2;
         R[i] = min(lambda1, lambda2);
+    }
+}
 
-        // Store the strongest score.
-        if (R[i] > strongestScore) {
-            strongestScore = R[i];
-        }
+__global__ void cornerScoreOnDevice(unsigned char *gradX, unsigned char *gradY, float *R, int width, int height) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-        // Add current pixel to the queue.
-        qR.push(std::pair<float, int>(R[i], i));
+    const int windowSide = 3;
+    const int windowMargin = int((windowSide - 1) / 2);
+
+    // Check for overflow.
+    if (i >= width * height) {
+        return;
     }
 
-    // Extract the top-K corners.
-    float threshold = strongestScore * qualityLevel;
-    for (int i = 0; i < maxCorners; ++i) {
-        float kValue;
-        int kIndex;
-        bool isDistant;
+    int x = (int) i / width;
+    int y = (i % width);
 
-        do {
-            kValue = qR.top().first;
-            kIndex = qR.top().second;
-            isDistant = true;
-
-            // Evaluate the Euclidean distance to the previous corners.
-            int j = 0;
-            while (j < i and isDistant) {
-                int otherIndex = corners[j];
-                int dx = ((int) otherIndex / width) - ((int) kIndex / width);
-                int dy = (otherIndex % width) - (kIndex % width);
-                int dist = sqrt(pow(dx, 2) + pow(dy, 2));
-
-                isDistant = dist > minDistance;
-                j++;
-            }
-
-            if (isDistant) {
-                // Add only if score is high enough.
-                if (kValue >= threshold) {
-                    corners[i] = kIndex;
-                } else {
-                    corners[i] = -1;
-                }
-            }
-
-            qR.pop();
-        } while (not isDistant or kValue < threshold);
+    // Check for out-of-bound coordinates.
+    R[i] = 0;
+    if (x < windowMargin or y < windowMargin or x > height - windowMargin - 1 or y > width - windowMargin - 1) {
+        return;
     }
+
+    // Create the windows Ix and Iy.
+    float *Ix = new float[windowSide * windowSide];
+    float *Iy = new float[windowSide * windowSide];
+    for (int wi = 0; wi < windowSide * windowSide; wi++) {
+        int dx = ((int) wi / windowSide) - windowMargin;
+        int dy = (wi % windowSide) - windowMargin;
+        int di = (x + dx) * width + (y + dy);
+
+        Ix[wi] = (float) gradX[di] / PIXEL_VALUES;
+        Iy[wi] = (float) gradY[di] / PIXEL_VALUES;
+    }
+
+    // Construct the structural matrix.
+    float *M = new float[4]{0, 0, 0, 0};
+    sumOfMatmulOnDevice(&M[0], Ix, Ix, windowSide);
+    sumOfMatmulOnDevice(&M[1], Ix, Iy, windowSide);
+    sumOfMatmulOnDevice(&M[2], Iy, Ix, windowSide);
+    sumOfMatmulOnDevice(&M[3], Iy, Iy, windowSide);
+
+    delete[] Ix;
+    delete[] Iy;
+
+    // Evaluate the pixel score.
+    float lambda1 = ((M[0] + M[3]) + sqrt(pow(-M[0] - M[3], 2) - 4 * (M[0] * M[3] - M[1] * M[2]))) / 2;
+    float lambda2 = ((M[0] + M[3]) - sqrt(pow(-M[0] - M[3], 2) - 4 * (M[0] * M[3] - M[1] * M[2]))) / 2;
+    R[i] = min(lambda1, lambda2);
+
+    delete[] M;
 }
 
 void histogramOnHost(unsigned char *dst, unsigned char *src, const int width, const int height, const int channels) {
