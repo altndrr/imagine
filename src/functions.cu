@@ -435,3 +435,19 @@ void sumOfMatmulOnHost(float *total, float *A, float *B, int side) {
         *total += C[i];
     }
 }
+
+__device__ void sumOfMatmulOnDevice(float *total, float *A, float *B, int side) {
+    *total = 0;
+
+    for (int i = 0; i < side * side; i++) {
+        int x = (int) i / side;
+        int y = (i % side);
+
+        for (int d = 0; d < side; d++) {
+            int ia = x * side + d;
+            int ib = d * side + y;
+
+            *total += A[ia] * B[ib];
+        }
+    }
+}

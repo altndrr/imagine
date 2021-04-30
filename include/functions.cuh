@@ -40,4 +40,6 @@ __global__ void transposeOnDevice(unsigned char *data, const int width, const in
 
 void sumOfMatmulOnHost(float *total, float *A, float *B, int side);
 
+__device__ void sumOfMatmulOnDevice(float *total, float *A, float *B, int side);
+
 #endif //IMAGINE_FUNCTIONS_H
