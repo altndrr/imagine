@@ -44,6 +44,10 @@ public:
 
     void convolution(float *kernel, int kernelSide);
 
+    void drawLine(int index1, int index2, int radius, int *color, int colorSize);
+
+    void drawLine(int x1, int y1, int x2, int y2, int radius, int *color, int colorSize);
+
     void drawPoint(int index, int radius, int *color, int colorSize);
 
     void drawPoint(int x, int y, int radius, int *color, int colorSize);

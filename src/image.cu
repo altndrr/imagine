@@ -225,6 +225,36 @@ void Image::convolution(float *kernel, int kernelSide) {
     }
 }
 
+void Image::drawLine(int index1, int index2, int radius, int *color, int colorSize) {
+    if (index1 < 0 or index2 < 0) {
+        return;
+    }
+
+    int x1 = (int) (index1 / getWidth());
+    int y1 = (index1 % getWidth());
+    int x2 = (int) (index2 / getWidth());
+    int y2 = (index2 % getWidth());
+    this->drawLine(x1, y1, x2, y2, radius, color, colorSize);
+}
+
+void Image::drawLine(int x1, int y1, int x2, int y2, int radius, int *color, int colorSize) {
+    if (strcmp(_device, _validDevices[0]) == 0) {
+        drawLineOnHost(getData(), x1, y1, x2, y2, radius, color, colorSize, getWidth(), getHeight(), getChannels());
+    } else {
+        int blockSize = 1024;
+        dim3 threads(blockSize, 1);
+        dim3 blocks((getWidth() * getHeight() + threads.x - 1) / threads.x, 1);
+
+        size_t colorBytes = colorSize * sizeof(int);
+        int *d_color;
+        cudaMalloc((int **) &d_color, colorBytes);
+        cudaMemcpy(d_color, color, colorBytes, cudaMemcpyHostToDevice);
+
+        drawLineOnDevice<<<blocks, threads>>>(getData(), x1, y1, x2, y2, radius, d_color, colorSize, getWidth(),
+                                              getHeight(), getChannels());
+    }
+}
+
 void Image::drawPoint(int index, int radius, int *color, int colorSize) {
     if (index < 0) {
         return;

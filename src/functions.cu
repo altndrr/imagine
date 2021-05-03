@@ -75,6 +75,54 @@ __global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src, floa
     }
 }
 
+void drawLineOnHost(unsigned char *data, int x1, int y1, int x2, int y2, int radius, int *color, int colorSize,
+                    int width, int height, int channels) {
+    for (int dy = min(y1, y2); dy < max(y1, y2); dy++) {
+        for (int dx = min(x1, x2); dx < max(x1, x2); dx++) {
+            int interpolatedY = (y1 * (x2 - dx) + y2 * (dx - x1)) / (x2 - x1);
+
+            if (interpolatedY - radius > dy or interpolatedY + radius < dy) {
+                continue;
+            }
+
+            int index = (dx * width + dy) * channels;
+
+            for (int c = 0; c < min(channels, colorSize); c++) {
+                if (index + c < width * height * channels) {
+                    data[index + c] = color[c];
+                }
+            }
+        }
+    }
+}
+
+__global__ void drawLineOnDevice(unsigned char *data, int x1, int y1, int x2, int y2, int radius, int *color,
+                                 int colorSize, int width, int height, int channels) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Check for overflow.
+    if (i >= width * height) {
+        return;
+    }
+
+    int dx = (int) i / width;
+    int dy = (i % width);
+
+    // Check for boundaries.
+    int interpolatedY = (y1 * (x2 - dx) + y2 * (dx - x1)) / (x2 - x1);
+    if (dx < min(x1, x2) or dx >= max(x1, x2) or dy < min(y1, y2) or dy >= max(y1, y2) or interpolatedY - radius > dy or
+        interpolatedY + radius < dy) {
+        return;
+    }
+
+    for (int c = 0; c < min(channels, colorSize); c++) {
+        int index = channels * i;
+        if (index + c < width * height * channels) {
+            data[index + c] = color[c];
+        }
+    }
+}
+
 void drawPointOnHost(unsigned char *data, int x, int y, int radius, int *color, int colorSize, int width, int height,
                      int channels) {
     for (int dy = max(0, y - radius); dy < y + radius; dy++) {

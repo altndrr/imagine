@@ -9,6 +9,12 @@ void convolutionOnHost(unsigned char *dst, unsigned char *src, float *kernel, in
 __global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src, float *kernel, int kernelSide,
                                     const int width, const int height, const int channels);
 
+void drawLineOnHost(unsigned char *data, int x1, int y1, int x2, int y2, int radius, int *color, int colorSize,
+                    int width, int height, int channels);
+
+__global__ void drawLineOnDevice(unsigned char *data, int x1, int y1, int x2, int y2, int radius, int *color,
+                                 int colorSize, int width, int height, int channels);
+
 void drawPointOnHost(unsigned char *data, int x, int y, int radius, int *color, int colorSize, int width, int height,
                      int channels);
 
