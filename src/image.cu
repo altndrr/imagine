@@ -318,13 +318,11 @@ void Image::goodFeaturesToTrack(int *corners, int maxCorners, float qualityLevel
                 // Add only if score is high enough.
                 if (kValue >= threshold) {
                     corners[i] = kIndex;
-                } else {
-                    corners[i] = -1;
                 }
             }
 
             qR.pop();
-        } while (not isDistant and kValue < threshold);
+        } while (not isDistant);
     }
 }
 
