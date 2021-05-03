@@ -44,6 +44,8 @@ public:
 
     void convolution(float *kernel, int kernelSide);
 
+    void drawPoint(int index, int radius, int *color, int colorSize);
+
     void drawPoint(int x, int y, int radius, int *color, int colorSize);
 
     void goodFeaturesToTrack(int *corners, int maxCorners, float qualityLevel, float minDistance);

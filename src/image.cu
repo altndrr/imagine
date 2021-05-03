@@ -225,6 +225,16 @@ void Image::convolution(float *kernel, int kernelSide) {
     }
 }
 
+void Image::drawPoint(int index, int radius, int *color, int colorSize) {
+    if (index < 0) {
+        return;
+    }
+
+    int x = (int) (index / getWidth());
+    int y = (index % getWidth());
+    this->drawPoint(x, y, radius, color, colorSize);
+}
+
 void Image::drawPoint(int x, int y, int radius, int *color, int colorSize) {
     if (strcmp(_device, _validDevices[0]) == 0) {
         drawPointOnHost(getData(), x, y, radius, color, colorSize, getWidth(), getHeight(), getChannels());
