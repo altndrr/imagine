@@ -293,6 +293,11 @@ void Image::goodFeaturesToTrack(int *corners, int maxCorners, float qualityLevel
     std::priority_queue <std::pair<float, int>> qR;
     float strongestScore = 0.00;
     for (int i = 0; i < scoreSize; i++) {
+        // Skip nan values.
+        if (scoreMatrix[i] != scoreMatrix[i]) {
+            continue;
+        }
+
         qR.push(std::pair<float, int>(scoreMatrix[i], i));
         if (strongestScore < scoreMatrix[i]) {
             strongestScore = scoreMatrix[i];
