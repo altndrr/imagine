@@ -1,6 +1,7 @@
-#include "../include/functions.cuh"
-#include "../include/common.h"
 #include <cmath>
+
+#include "../include/common.h"
+#include "../include/functions.cuh"
 
 void convolutionOnHost(unsigned char *dst, unsigned char *src, float *kernel, int kernelSide,
                        const int width, const int height, const int channels) {
@@ -9,11 +10,9 @@ void convolutionOnHost(unsigned char *dst, unsigned char *src, float *kernel, in
     // Loop through each pixel.
     for (int y = margin; y < width - margin; y++) {
         for (int x = margin; x < height - margin; x++) {
-
             // Loop through each element of the kernel.
             for (int dy = 0; dy < kernelSide; dy++) {
                 for (int dx = 0; dx < kernelSide; dx++) {
-
                     // Loop through the channels of the image.
                     for (int c = 0; c < channels; c++) {
                         int src_i = channels * ((x + (dx - margin)) * width + (y + (dy - margin))) + c;
@@ -45,7 +44,7 @@ __global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src, floa
 
     unsigned int margin = int((kernelSide - 1) / 2);
 
-    int x = (int) i / width;
+    int x = (int)i / width;
     int y = (i % width);
 
     // Check for minimum padding.
@@ -56,7 +55,6 @@ __global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src, floa
     // Loop through each element of the kernel.
     for (int dy = 0; dy < kernelSide; dy++) {
         for (int dx = 0; dx < kernelSide; dx++) {
-
             // Loop through the channels of the image.
             for (int c = 0; c < channels; c++) {
                 int src_i = channels * ((x + (dx - margin)) * width + (y + (dy - margin))) + c;
@@ -105,7 +103,7 @@ __global__ void drawLineOnDevice(unsigned char *data, int x1, int y1, int x2, in
         return;
     }
 
-    int dx = (int) i / width;
+    int dx = (int)i / width;
     int dy = (i % width);
 
     // Check for boundaries.
@@ -147,7 +145,7 @@ __global__ void drawPointOnDevice(unsigned char *data, int x, int y, int radius,
         return;
     }
 
-    int dx = (int) i / width;
+    int dx = (int)i / width;
     int dy = (i % width);
 
     // Check for point boundaries.
@@ -199,7 +197,7 @@ void cornerScoreOnHost(unsigned char *gradX, unsigned char *gradY, float *R, int
     const int windowMargin = int((windowSide - 1) / 2);
 
     for (int i = 0; i < width * height; i++) {
-        int x = (int) i / width;
+        int x = (int)i / width;
         int y = (i % width);
 
         // Check for out-of-bound coordinates.
@@ -212,12 +210,12 @@ void cornerScoreOnHost(unsigned char *gradX, unsigned char *gradY, float *R, int
         float *Ix = new float[windowSide * windowSide];
         float *Iy = new float[windowSide * windowSide];
         for (int wi = 0; wi < windowSide * windowSide; wi++) {
-            int dx = ((int) wi / windowSide) - windowMargin;
+            int dx = ((int)wi / windowSide) - windowMargin;
             int dy = (wi % windowSide) - windowMargin;
             int di = (x + dx) * width + (y + dy);
 
-            Ix[wi] = (float) gradX[di] / PIXEL_VALUES;
-            Iy[wi] = (float) gradY[di] / PIXEL_VALUES;
+            Ix[wi] = (float)gradX[di] / PIXEL_VALUES;
+            Iy[wi] = (float)gradY[di] / PIXEL_VALUES;
         }
 
         // Construct the structural matrix.
@@ -245,7 +243,7 @@ __global__ void cornerScoreOnDevice(unsigned char *gradX, unsigned char *gradY, 
         return;
     }
 
-    int x = (int) i / width;
+    int x = (int)i / width;
     int y = (i % width);
 
     // Check for out-of-bound coordinates.
@@ -258,12 +256,12 @@ __global__ void cornerScoreOnDevice(unsigned char *gradX, unsigned char *gradY, 
     float *Ix = new float[windowSide * windowSide];
     float *Iy = new float[windowSide * windowSide];
     for (int wi = 0; wi < windowSide * windowSide; wi++) {
-        int dx = ((int) wi / windowSide) - windowMargin;
+        int dx = ((int)wi / windowSide) - windowMargin;
         int dy = (wi % windowSide) - windowMargin;
         int di = (x + dx) * width + (y + dy);
 
-        Ix[wi] = (float) gradX[di] / PIXEL_VALUES;
-        Iy[wi] = (float) gradY[di] / PIXEL_VALUES;
+        Ix[wi] = (float)gradX[di] / PIXEL_VALUES;
+        Iy[wi] = (float)gradY[di] / PIXEL_VALUES;
     }
 
     // Construct the structural matrix.
@@ -346,11 +344,10 @@ void rotateOnHost(unsigned char *dst, unsigned char *src, const double radian, c
 
                 // Evaluate the four pixels given xs and ys roundings.
                 int ia[4] = {
-                        channels * (int(floor(xa)) * width + int(floor(ya))) + c,
-                        channels * (int(floor(xa)) * width + int(ceil(ya))) + c,
-                        channels * (int(ceil(xa)) * width + int(floor(ya))) + c,
-                        channels * (int(ceil(xa)) * width + int(ceil(ya))) + c
-                };
+                    channels * (int(floor(xa)) * width + int(floor(ya))) + c,
+                    channels * (int(floor(xa)) * width + int(ceil(ya))) + c,
+                    channels * (int(ceil(xa)) * width + int(floor(ya))) + c,
+                    channels * (int(ceil(xa)) * width + int(ceil(ya))) + c};
 
                 // Evaluate the average value of the destination pixel.
                 float sum = 0.0;
@@ -377,7 +374,7 @@ __global__ void rotateOnDevice(unsigned char *dst, unsigned char *src, const dou
         return;
     }
 
-    int x = (int) i / width;
+    int x = (int)i / width;
     int y = (i % width);
 
     // Evaluate the source pixels.
@@ -402,11 +399,10 @@ __global__ void rotateOnDevice(unsigned char *dst, unsigned char *src, const dou
 
         // Evaluate the four pixels given xs and ys roundings.
         int ia[4] = {
-                channels * (int(floor(xa)) * width + int(floor(ya))) + c,
-                channels * (int(floor(xa)) * width + int(ceil(ya))) + c,
-                channels * (int(ceil(xa)) * width + int(floor(ya))) + c,
-                channels * (int(ceil(xa)) * width + int(ceil(ya))) + c
-        };
+            channels * (int(floor(xa)) * width + int(floor(ya))) + c,
+            channels * (int(floor(xa)) * width + int(ceil(ya))) + c,
+            channels * (int(ceil(xa)) * width + int(floor(ya))) + c,
+            channels * (int(ceil(xa)) * width + int(ceil(ya))) + c};
 
         // Evaluate the average value of the destination pixel.
         float sum = 0.0;
@@ -441,7 +437,6 @@ void transposeOnHost(unsigned char *data, const int width, const int height, con
     }
 }
 
-
 __global__ void transposeOnDevice(unsigned char *data, const int width, const int height, const int channels) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -452,7 +447,7 @@ __global__ void transposeOnDevice(unsigned char *data, const int width, const in
 
     for (int c = 0; c < channels; c++) {
         int ia = channels * i + c;
-        int ib = channels * ((i % width) * height + ((int) i / width)) + c;
+        int ib = channels * ((i % width) * height + ((int)i / width)) + c;
 
         if (ia > ib) {
             continue;
@@ -469,7 +464,7 @@ void sumOfMatmulOnHost(float *total, float *A, float *B, int side) {
     *total = 0;
 
     for (int i = 0; i < side * side; i++) {
-        int x = (int) i / side;
+        int x = (int)i / side;
         int y = (i % side);
 
         C[i] = 0;
@@ -488,7 +483,7 @@ __device__ void sumOfMatmulOnDevice(float *total, float *A, float *B, int side) 
     *total = 0;
 
     for (int i = 0; i < side * side; i++) {
-        int x = (int) i / side;
+        int x = (int)i / side;
         int y = (i % side);
 
         for (int d = 0; d < side; d++) {

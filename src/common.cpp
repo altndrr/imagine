@@ -1,8 +1,9 @@
 #include "../include/common.h"
 
-#include <cstring>
 #include <stdio.h>
 #include <sys/time.h>
+
+#include <cstring>
 
 bool arrayContains(char **list, std::string word) {
     for (int i = 0; i < len(list); i++) {
@@ -27,7 +28,7 @@ bool arrayContains(const char **list, std::string word) {
 double cpuSecond() {
     struct timeval tp;
     gettimeofday(&tp, NULL);
-    return ((double) tp.tv_sec + (double) tp.tv_usec * 1.e-6);
+    return ((double)tp.tv_sec + (double)tp.tv_usec * 1.e-6);
 }
 
 size_t len(char **array) {

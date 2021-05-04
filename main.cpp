@@ -1,7 +1,12 @@
 #include "include/main.h"
-#include "include/common.h"
-#include <string>
+
 #include <stdio.h>
+
+#include <string>
+
+#include "include/common.h"
+#include "include/image.cuh"
+#include "include/kernel.h"
 
 void commandHelp() {
     printf("%s\n", USAGE);
@@ -13,7 +18,7 @@ void commandVersion() {
     exit(0);
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     // If no argument is passed, call help command.
     if (argc == 1) {
         commandHelp();

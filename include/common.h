@@ -1,8 +1,9 @@
 #ifndef IMAGINE_COMMON_H
 #define IMAGINE_COMMON_H
 
-#include "stdio.h"
 #include <string>
+
+#include "stdio.h"
 
 const int PIXEL_VALUES = 256;
 
@@ -16,4 +17,4 @@ size_t len(char **array);
 
 size_t len(const char **array);
 
-#endif //IMAGINE_COMMON_H
+#endif  //IMAGINE_COMMON_H
