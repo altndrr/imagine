@@ -424,6 +424,50 @@ void Image::rotate(double degree) {
     }
 }
 
+void Image::scale(float ratio) {
+    // Return if ratio is invalid.
+    if (ratio == 1.0 or ratio < 0.0) {
+        return;
+    }
+
+    unsigned char *newData;
+    int newWidth = int(getWidth() * ratio);
+    int newHeight = int(getHeight() * ratio);
+    int newBytes = newWidth * newHeight * getChannels() * sizeof(unsigned char);
+
+    if (strcmp(_device, _validDevices[0]) == 0) {
+        newData = (unsigned char *) malloc(newBytes);
+        scaleOnHost(newData, getData(), ratio, getWidth(), getHeight(), getChannels());
+
+        // Update data both on device and on host.
+        free(_h_data);
+        _h_data = newData;
+        cudaFree(_d_data);
+        cudaMalloc((unsigned char **) &_d_data, newBytes);
+        cudaMemcpy(_d_data, _h_data, newBytes, cudaMemcpyHostToDevice);
+    } else {
+        int blockSize = 1024;
+        dim3 threads(blockSize, 1);
+        dim3 blocks((newWidth * newHeight + threads.x - 1) / threads.x, 1);
+
+        cudaMalloc((unsigned char **) &newData, newBytes);
+        scaleOnDevice<<<blocks, threads>>>(newData, getData(), ratio, getWidth(), getHeight(), getChannels());
+        
+        // Update data both on device and on host.
+        cudaFree(_d_data);
+        cudaMalloc((unsigned char **) &_d_data, newBytes);
+        cudaMemcpy(_d_data, newData, newBytes, cudaMemcpyDeviceToDevice);
+        free(_h_data);
+        _h_data = (unsigned char *) malloc(newBytes);
+        cudaMemcpy(_h_data, _d_data, newBytes, cudaMemcpyDeviceToHost);
+    }
+
+    // Update other attributes.
+    _width = newWidth;
+    _height = newHeight;
+    _nBytes = newBytes;
+}
+
 void Image::transpose() {
     // Return if width and height are different.
     if (getWidth() != getHeight()) {

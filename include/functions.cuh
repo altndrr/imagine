@@ -41,6 +41,10 @@ void rotateOnHost(unsigned char *dst, unsigned char *src, const double radian, c
 __global__ void rotateOnDevice(unsigned char *dst, unsigned char *src, const double radian, const int width,
                                const int height, const int channels);
 
+void scaleOnHost(unsigned char *dst, unsigned char *src, const double ratio, const int width, const int height, const int channels);
+
+__global__ void scaleOnDevice(unsigned char *dst, unsigned char *src, const double ratio, const int width, const int height, const int channels);
+
 void transposeOnHost(unsigned char *data, const int width, const int height, const int channels);
 
 __global__ void transposeOnDevice(unsigned char *data, const int width, const int height, const int channels);

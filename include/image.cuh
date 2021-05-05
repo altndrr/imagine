@@ -58,6 +58,8 @@ public:
 
     void rotate(double degree);
 
+    void scale(float ratio);
+
     void transpose();
 
 private:

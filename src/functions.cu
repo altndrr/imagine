@@ -418,6 +418,67 @@ __global__ void rotateOnDevice(unsigned char *dst, unsigned char *src, const dou
     }
 }
 
+void scaleOnHost(unsigned char *dst, unsigned char *src, const double ratio, const int width, const int height, const int channels) {
+    int newWidth = width * ratio;
+    int newHeight = height * ratio;
+    float inverseRatio = 1.0/ratio;
+    
+    for (int y = 0; y < newWidth; y++) {
+        for (int x = 0; x < newHeight; x++) {
+            for (int c = 0; c < channels; c++) {
+                int i = (x * newWidth + y) * channels + c;
+                float tempValue = 0.0;
+
+                for (int dy = -1; dy < 2; dy++) {
+                    for (int dx = -1; dx < 2; dx++) {
+                        int oldI = ((int(inverseRatio * x) + dx) * width + (int(inverseRatio * y) + dy)) * channels + c;
+                        float weight = 1/(pow(2, 2+abs(dx)+abs(dy)));
+
+                        if (oldI < 0 or oldI > width * height * channels) {
+                            continue;
+                        }
+                        tempValue += weight * src[oldI];
+                    }
+                }
+                dst[i] = tempValue;
+            }
+        }
+    }
+}
+
+__global__ void scaleOnDevice(unsigned char *dst, unsigned char *src, const double ratio, const int width, const int height, const int channels) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    int newWidth = width * ratio;
+    int newHeight = height * ratio;
+    float inverseRatio = 1.0/ratio;
+
+    // Check for overflow.
+    if (i > newWidth * newHeight) {
+        return;
+    }
+
+    int x = (int)i / newWidth;
+    int y = (i % newHeight);
+
+    for (int c = 0; c < channels; c++) {
+        float tempValue = 0.0;
+
+        for (int dy = -1; dy < 2; dy++) {
+            for (int dx = -1; dx < 2; dx++) {
+                int src_i = ((int(inverseRatio * x) + dx) * width + (int(inverseRatio * y) + dy)) * channels + c;
+                float weight = 1/(pow(2, 2+abs(dx)+abs(dy)));
+
+                if (src_i < 0 or src_i > width * height * channels) {
+                    continue;
+                }
+                tempValue += weight * src[src_i];
+            }
+        }
+        dst[i * channels + c] = tempValue;
+    }
+}
+
 void transposeOnHost(unsigned char *data, const int width, const int height, const int channels) {
     for (int y = 0; y < width; y++) {
         for (int x = 0; x < height; x++) {
