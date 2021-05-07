@@ -1,6 +1,6 @@
-#include "../include/image.cuh"
 #include "../include/common.h"
 #include "../include/functions.cuh"
+#include "../include/image.cuh"
 #include "../include/kernel.h"
 #include "../libs/stb/stb_image.h"
 #include "../libs/stb/stb_image_write.h"
@@ -30,20 +30,18 @@ Image::Image(const char *filename, bool grayscale) {
     _nBytes = w * h * desiredChannels * sizeof(unsigned char);
 
     // Allocate space for the host copy.
-    _h_data = (unsigned char *) malloc(_nBytes);
+    _h_data = (unsigned char *)malloc(_nBytes);
     for (int i = 0; i < w * h * desiredChannels; i++) {
         _h_data[i] = data[i];
     }
 
     // Allocate space for the cuda copy.
-    cudaMalloc((unsigned char **) &_d_data, _nBytes);
+    cudaMalloc((unsigned char **)&_d_data, _nBytes);
 
     stbi_image_free(data);
 }
 
-Image::Image(const char *filename) : Image(filename, false) {
-    ;
-}
+Image::Image(const char *filename) : Image(filename, false) { ; }
 
 Image::Image(const Image &obj) {
     _device = obj._device;
@@ -54,13 +52,13 @@ Image::Image(const Image &obj) {
     _nBytes = _width * _height * _channels * sizeof(unsigned char);
 
     // Allocate space for the host copy.
-    _h_data = (unsigned char *) malloc(_nBytes);
+    _h_data = (unsigned char *)malloc(_nBytes);
     for (int i = 0; i < _width * _height * _channels; i++) {
         _h_data[i] = obj._h_data[i];
     }
 
     // Allocate space for the cuda copy.
-    cudaMalloc((unsigned char **) &_d_data, _nBytes);
+    cudaMalloc((unsigned char **)&_d_data, _nBytes);
     cudaMemcpy(_d_data, obj._d_data, _nBytes, cudaMemcpyDeviceToDevice);
 }
 
@@ -71,7 +69,8 @@ Image::~Image(void) {
 
 Image Image::operator-(const Image &obj) {
     // Return if images have different sizes.
-    if (_width != obj._width or _height != obj._height or _channels != obj._channels) {
+    if (_width != obj._width or _height != obj._height or
+        _channels != obj._channels) {
         throw std::invalid_argument("images have different sizes");
     }
 
@@ -79,20 +78,21 @@ Image Image::operator-(const Image &obj) {
     result.setDevice(_device);
 
     if (strcmp(_device, _validDevices[0]) == 0) {
-        differenceOnHost(result.getData(), getData(), getWidth(), getHeight(), getChannels());
+        differenceOnHost(result.getData(), getData(), getWidth(), getHeight(),
+                         getChannels());
     } else {
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
         dim3 blocks((getSize() + threads.x - 1) / threads.x, 1);
-        differenceOnDevice<<<blocks, threads>>>(result.getData(), getData(), getWidth(), getHeight(), getChannels());
+        differenceOnDevice<<<blocks, threads>>>(result.getData(), getData(),
+                                                getWidth(), getHeight(),
+                                                getChannels());
     }
 
     return result;
 }
 
-int Image::getChannels() {
-    return _channels;
-}
+int Image::getChannels() { return _channels; }
 
 unsigned char *Image::getData() {
     if (strcmp(_device, _validDevices[0]) == 0) {
@@ -102,9 +102,7 @@ unsigned char *Image::getData() {
     }
 }
 
-const char *Image::getDevice() {
-    return _device;
-}
+const char *Image::getDevice() { return _device; }
 
 unsigned int *Image::getElement(int index) {
     unsigned int *values = new unsigned int[_channels];
@@ -134,24 +132,16 @@ unsigned int *Image::getElement(int row, int col) {
     return getElement(row * _width + col);
 }
 
-const char *Image::getFilename() {
-    return _filename;
-}
+const char *Image::getFilename() { return _filename; }
 
-int Image::getHeight() {
-    return _height;
-}
+int Image::getHeight() { return _height; }
 
-int Image::getSize() {
-    return _width * _height * _channels;
-}
+int Image::getSize() { return _width * _height * _channels; }
 
-int Image::getWidth() {
-    return _width;
-}
+int Image::getWidth() { return _width; }
 
 bool Image::isSynchronized() {
-    unsigned char *h_d_data_copy = (unsigned char *) malloc(_nBytes);
+    unsigned char *h_d_data_copy = (unsigned char *)malloc(_nBytes);
     cudaMemcpy(h_d_data_copy, _d_data, _nBytes, cudaMemcpyDeviceToHost);
 
     float epsilon = 1.0E-8;
@@ -173,7 +163,8 @@ void Image::save(const char *filename) {
         cudaMemcpy(_h_data, _d_data, _nBytes, cudaMemcpyDeviceToHost);
     }
 
-    stbi_write_png(filename, _width, _height, _channels, _h_data, _width * _channels);
+    stbi_write_png(filename, _width, _height, _channels, _h_data,
+                   _width * _channels);
 }
 
 void Image::setDevice(const char *device) {
@@ -197,49 +188,55 @@ void Image::convolution(float *kernel, int kernelSide) {
 
     if (strcmp(_device, _validDevices[0]) == 0) {
         // Create a copy of the data on host.
-        dataCopy = (unsigned char *) malloc(_nBytes);
+        dataCopy = (unsigned char *)malloc(_nBytes);
         for (int i = 0; i < getSize(); i++) {
             dataCopy[i] = getData()[i];
         }
 
-        convolutionOnHost(getData(), dataCopy, kernel, kernelSide, getWidth(), getHeight(),
-                          getChannels());
+        convolutionOnHost(getData(), dataCopy, kernel, kernelSide, getWidth(),
+                          getHeight(), getChannels());
     } else {
         // Create a copy of the data on device.
-        cudaMalloc((unsigned char **) &dataCopy, _nBytes);
+        cudaMalloc((unsigned char **)&dataCopy, _nBytes);
         cudaMemcpy(dataCopy, getData(), _nBytes, cudaMemcpyDeviceToDevice);
 
         // Copy kernel to device.
         float *d_kernel;
-        cudaMalloc((float **) &d_kernel, kernelSide * kernelSide * sizeof(float));
-        cudaMemcpy(d_kernel, kernel, kernelSide * kernelSide * sizeof(float), cudaMemcpyHostToDevice);
+        cudaMalloc((float **)&d_kernel,
+                   kernelSide * kernelSide * sizeof(float));
+        cudaMemcpy(d_kernel, kernel, kernelSide * kernelSide * sizeof(float),
+                   cudaMemcpyHostToDevice);
 
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
         dim3 blocks((getWidth() * getHeight() + threads.x - 1) / threads.x, 1);
-        convolutionOnDevice<<<blocks, threads>>>(getData(), dataCopy, d_kernel, kernelSide, getWidth(), getHeight(),
-                                                 getChannels());
+        convolutionOnDevice<<<blocks, threads>>>(getData(), dataCopy, d_kernel,
+                                                 kernelSide, getWidth(),
+                                                 getHeight(), getChannels());
 
         // Free memory.
         cudaFree(dataCopy);
     }
 }
 
-void Image::drawLine(int index1, int index2, int radius, int *color, int colorSize) {
+void Image::drawLine(int index1, int index2, int radius, int *color,
+                     int colorSize) {
     if (index1 < 0 or index2 < 0) {
         return;
     }
 
-    int x1 = (int) (index1 / getWidth());
+    int x1 = (int)(index1 / getWidth());
     int y1 = (index1 % getWidth());
-    int x2 = (int) (index2 / getWidth());
+    int x2 = (int)(index2 / getWidth());
     int y2 = (index2 % getWidth());
     this->drawLine(x1, y1, x2, y2, radius, color, colorSize);
 }
 
-void Image::drawLine(int x1, int y1, int x2, int y2, int radius, int *color, int colorSize) {
+void Image::drawLine(int x1, int y1, int x2, int y2, int radius, int *color,
+                     int colorSize) {
     if (strcmp(_device, _validDevices[0]) == 0) {
-        drawLineOnHost(getData(), x1, y1, x2, y2, radius, color, colorSize, getWidth(), getHeight(), getChannels());
+        drawLineOnHost(getData(), x1, y1, x2, y2, radius, color, colorSize,
+                       getWidth(), getHeight(), getChannels());
     } else {
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
@@ -247,10 +244,11 @@ void Image::drawLine(int x1, int y1, int x2, int y2, int radius, int *color, int
 
         size_t colorBytes = colorSize * sizeof(int);
         int *d_color;
-        cudaMalloc((int **) &d_color, colorBytes);
+        cudaMalloc((int **)&d_color, colorBytes);
         cudaMemcpy(d_color, color, colorBytes, cudaMemcpyHostToDevice);
 
-        drawLineOnDevice<<<blocks, threads>>>(getData(), x1, y1, x2, y2, radius, d_color, colorSize, getWidth(),
+        drawLineOnDevice<<<blocks, threads>>>(getData(), x1, y1, x2, y2, radius,
+                                              d_color, colorSize, getWidth(),
                                               getHeight(), getChannels());
     }
 }
@@ -260,14 +258,15 @@ void Image::drawPoint(int index, int radius, int *color, int colorSize) {
         return;
     }
 
-    int x = (int) (index / getWidth());
+    int x = (int)(index / getWidth());
     int y = (index % getWidth());
     this->drawPoint(x, y, radius, color, colorSize);
 }
 
 void Image::drawPoint(int x, int y, int radius, int *color, int colorSize) {
     if (strcmp(_device, _validDevices[0]) == 0) {
-        drawPointOnHost(getData(), x, y, radius, color, colorSize, getWidth(), getHeight(), getChannels());
+        drawPointOnHost(getData(), x, y, radius, color, colorSize, getWidth(),
+                        getHeight(), getChannels());
     } else {
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
@@ -275,15 +274,17 @@ void Image::drawPoint(int x, int y, int radius, int *color, int colorSize) {
 
         size_t colorBytes = colorSize * sizeof(int);
         int *d_color;
-        cudaMalloc((int **) &d_color, colorBytes);
+        cudaMalloc((int **)&d_color, colorBytes);
         cudaMemcpy(d_color, color, colorBytes, cudaMemcpyHostToDevice);
 
-        drawPointOnDevice<<<blocks, threads>>>(getData(), x, y, radius, d_color, colorSize, getWidth(), getHeight(),
-                                               getChannels());
+        drawPointOnDevice<<<blocks, threads>>>(getData(), x, y, radius, d_color,
+                                               colorSize, getWidth(),
+                                               getHeight(), getChannels());
     }
 }
 
-void Image::goodFeaturesToTrack(int *corners, int maxCorners, float qualityLevel, float minDistance) {
+void Image::goodFeaturesToTrack(int *corners, int maxCorners,
+                                float qualityLevel, float minDistance) {
     Image gradX(getFilename(), true);
     Image gradY(getFilename(), true);
     gradX.setDevice(getDevice());
@@ -300,27 +301,31 @@ void Image::goodFeaturesToTrack(int *corners, int maxCorners, float qualityLevel
     float *scoreMatrix = new float[scoreSize];
 
     if (strcmp(_device, _validDevices[0]) == 0) {
-        cornerScoreOnHost(gradX.getData(), gradY.getData(), scoreMatrix, getWidth(), getHeight());
+        cornerScoreOnHost(gradX.getData(), gradY.getData(), scoreMatrix,
+                          getWidth(), getHeight());
     } else {
         // Copy corner array to device.
         size_t scoreMatrixBytes = scoreSize * sizeof(float);
         float *d_scoreMatrix;
-        cudaMalloc((float **) &d_scoreMatrix, scoreMatrixBytes);
-        cudaMemcpy(d_scoreMatrix, scoreMatrix, scoreMatrixBytes, cudaMemcpyHostToDevice);
+        cudaMalloc((float **)&d_scoreMatrix, scoreMatrixBytes);
+        cudaMemcpy(d_scoreMatrix, scoreMatrix, scoreMatrixBytes,
+                   cudaMemcpyHostToDevice);
 
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
         dim3 blocks((scoreSize + threads.x - 1) / threads.x, 1);
-        cornerScoreOnDevice<<<blocks, threads>>>(gradX.getData(), gradY.getData(), d_scoreMatrix, getWidth(),
-                                                 getHeight());
+        cornerScoreOnDevice<<<blocks, threads>>>(gradX.getData(),
+                                                 gradY.getData(), d_scoreMatrix,
+                                                 getWidth(), getHeight());
 
         // Copy result to host.
-        cudaMemcpy(scoreMatrix, d_scoreMatrix, scoreMatrixBytes, cudaMemcpyDeviceToHost);
+        cudaMemcpy(scoreMatrix, d_scoreMatrix, scoreMatrixBytes,
+                   cudaMemcpyDeviceToHost);
         cudaFree(d_scoreMatrix);
     }
 
     // Create a priority queue of the scores and store the highest score.
-    std::priority_queue <std::pair<float, int>> qR;
+    std::priority_queue<std::pair<float, int>> qR;
     float strongestScore = 0.00;
     for (int i = 0; i < scoreSize; i++) {
         // Skip nan values.
@@ -351,7 +356,8 @@ void Image::goodFeaturesToTrack(int *corners, int maxCorners, float qualityLevel
             int j = 0;
             while (j < i and isDistant) {
                 int otherIndex = corners[j];
-                int dx = ((int) otherIndex / getWidth()) - ((int) kIndex / getWidth());
+                int dx =
+                    ((int)otherIndex / getWidth()) - ((int)kIndex / getWidth());
                 int dy = (otherIndex % getWidth()) - (kIndex % getWidth());
                 int dist = sqrt(pow(dx, 2) + pow(dy, 2));
 
@@ -373,24 +379,26 @@ void Image::goodFeaturesToTrack(int *corners, int maxCorners, float qualityLevel
 
 unsigned char *Image::histogram() {
     size_t histBytes = PIXEL_VALUES * getChannels() * sizeof(unsigned char);
-    unsigned char *histogram = (unsigned char *) malloc(histBytes);
+    unsigned char *histogram = (unsigned char *)malloc(histBytes);
 
     for (int i = 0; i < PIXEL_VALUES * getChannels(); i++) {
         histogram[i] = 0;
     }
 
     if (strcmp(_device, _validDevices[0]) == 0) {
-        histogramOnHost(histogram, getData(), getWidth(), getHeight(), getChannels());
+        histogramOnHost(histogram, getData(), getWidth(), getHeight(),
+                        getChannels());
     } else {
         // Copy histogram to device.
         unsigned char *d_histogram;
-        cudaMalloc((unsigned char **) &d_histogram, histBytes);
+        cudaMalloc((unsigned char **)&d_histogram, histBytes);
         cudaMemcpy(d_histogram, histogram, histBytes, cudaMemcpyHostToDevice);
 
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
         dim3 blocks((getSize() + threads.x - 1) / threads.x, 1);
-        histogramOnDevice<<<blocks, threads>>>(d_histogram, getData(), getWidth(), getHeight(), getChannels());
+        histogramOnDevice<<<blocks, threads>>>(
+            d_histogram, getData(), getWidth(), getHeight(), getChannels());
 
         // Copy result to host.
         cudaMemcpy(histogram, d_histogram, histBytes, cudaMemcpyDeviceToHost);
@@ -406,21 +414,23 @@ void Image::rotate(double degree) {
 
     if (strcmp(_device, _validDevices[0]) == 0) {
         // Create a copy of the data on host.
-        dataCopy = (unsigned char *) malloc(_nBytes);
+        dataCopy = (unsigned char *)malloc(_nBytes);
         for (int i = 0; i < getSize(); i++) {
             dataCopy[i] = getData()[i];
         }
 
-        rotateOnHost(getData(), dataCopy, rad, getWidth(), getHeight(), getChannels());
+        rotateOnHost(getData(), dataCopy, rad, getWidth(), getHeight(),
+                     getChannels());
     } else {
         // Copy histogram to device.
-        cudaMalloc((unsigned char **) &dataCopy, _nBytes);
+        cudaMalloc((unsigned char **)&dataCopy, _nBytes);
         cudaMemcpy(dataCopy, _d_data, _nBytes, cudaMemcpyDeviceToDevice);
 
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
         dim3 blocks((getWidth() * getHeight() + threads.x - 1) / threads.x, 1);
-        rotateOnDevice<<<blocks, threads>>>(getData(), dataCopy, rad, getWidth(), getHeight(), getChannels());
+        rotateOnDevice<<<blocks, threads>>>(
+            getData(), dataCopy, rad, getWidth(), getHeight(), getChannels());
     }
 }
 
@@ -436,29 +446,31 @@ void Image::scale(float ratio) {
     int newBytes = newWidth * newHeight * getChannels() * sizeof(unsigned char);
 
     if (strcmp(_device, _validDevices[0]) == 0) {
-        newData = (unsigned char *) malloc(newBytes);
-        scaleOnHost(newData, getData(), ratio, getWidth(), getHeight(), getChannels());
+        newData = (unsigned char *)malloc(newBytes);
+        scaleOnHost(newData, getData(), ratio, getWidth(), getHeight(),
+                    getChannels());
 
         // Update data both on device and on host.
         free(_h_data);
         _h_data = newData;
         cudaFree(_d_data);
-        cudaMalloc((unsigned char **) &_d_data, newBytes);
+        cudaMalloc((unsigned char **)&_d_data, newBytes);
         cudaMemcpy(_d_data, _h_data, newBytes, cudaMemcpyHostToDevice);
     } else {
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
         dim3 blocks((newWidth * newHeight + threads.x - 1) / threads.x, 1);
 
-        cudaMalloc((unsigned char **) &newData, newBytes);
-        scaleOnDevice<<<blocks, threads>>>(newData, getData(), ratio, getWidth(), getHeight(), getChannels());
-        
+        cudaMalloc((unsigned char **)&newData, newBytes);
+        scaleOnDevice<<<blocks, threads>>>(
+            newData, getData(), ratio, getWidth(), getHeight(), getChannels());
+
         // Update data both on device and on host.
         cudaFree(_d_data);
-        cudaMalloc((unsigned char **) &_d_data, newBytes);
+        cudaMalloc((unsigned char **)&_d_data, newBytes);
         cudaMemcpy(_d_data, newData, newBytes, cudaMemcpyDeviceToDevice);
         free(_h_data);
-        _h_data = (unsigned char *) malloc(newBytes);
+        _h_data = (unsigned char *)malloc(newBytes);
         cudaMemcpy(_h_data, _d_data, newBytes, cudaMemcpyDeviceToHost);
     }
 
@@ -480,6 +492,7 @@ void Image::transpose() {
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
         dim3 blocks((getWidth() * getHeight() + threads.x - 1) / threads.x, 1);
-        transposeOnDevice<<<blocks, threads>>>(getData(), getWidth(), getHeight(), getChannels());
+        transposeOnDevice<<<blocks, threads>>>(getData(), getWidth(),
+                                               getHeight(), getChannels());
     }
 }

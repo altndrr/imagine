@@ -18,7 +18,7 @@ void commandVersion() {
     exit(0);
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     // If no argument is passed, call help command.
     if (argc == 1) {
         commandHelp();

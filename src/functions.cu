@@ -3,8 +3,9 @@
 #include "../include/common.h"
 #include "../include/functions.cuh"
 
-void convolutionOnHost(unsigned char *dst, unsigned char *src, float *kernel, int kernelSide,
-                       const int width, const int height, const int channels) {
+void convolutionOnHost(unsigned char *dst, unsigned char *src, float *kernel,
+                       int kernelSide, const int width, const int height,
+                       const int channels) {
     unsigned int margin = int((kernelSide - 1) / 2);
 
     // Loop through each pixel.
@@ -15,7 +16,9 @@ void convolutionOnHost(unsigned char *dst, unsigned char *src, float *kernel, in
                 for (int dx = 0; dx < kernelSide; dx++) {
                     // Loop through the channels of the image.
                     for (int c = 0; c < channels; c++) {
-                        int src_i = channels * ((x + (dx - margin)) * width + (y + (dy - margin))) + c;
+                        int src_i = channels * ((x + (dx - margin)) * width +
+                                                (y + (dy - margin))) +
+                                    c;
                         int ker_i = dx * kernelSide + dy;
                         int dst_i = channels * (x * width + y) + c;
 
@@ -33,8 +36,10 @@ void convolutionOnHost(unsigned char *dst, unsigned char *src, float *kernel, in
     }
 }
 
-__global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src, float *kernel, int kernelSide,
-                                    const int width, const int height, const int channels) {
+__global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src,
+                                    float *kernel, int kernelSide,
+                                    const int width, const int height,
+                                    const int channels) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
     // Check for overflow.
@@ -48,7 +53,8 @@ __global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src, floa
     int y = (i % width);
 
     // Check for minimum padding.
-    if (y < margin or y > width - margin - 1 or x < margin or x > height - margin - 1) {
+    if (y < margin or y > width - margin - 1 or x < margin or
+        x > height - margin - 1) {
         return;
     }
 
@@ -57,7 +63,9 @@ __global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src, floa
         for (int dx = 0; dx < kernelSide; dx++) {
             // Loop through the channels of the image.
             for (int c = 0; c < channels; c++) {
-                int src_i = channels * ((x + (dx - margin)) * width + (y + (dy - margin))) + c;
+                int src_i = channels * ((x + (dx - margin)) * width +
+                                        (y + (dy - margin))) +
+                            c;
                 int ker_i = dx * kernelSide + dy;
                 int dst_i = channels * i + c;
 
@@ -73,8 +81,9 @@ __global__ void convolutionOnDevice(unsigned char *dst, unsigned char *src, floa
     }
 }
 
-void drawLineOnHost(unsigned char *data, int x1, int y1, int x2, int y2, int radius, int *color, int colorSize,
-                    int width, int height, int channels) {
+void drawLineOnHost(unsigned char *data, int x1, int y1, int x2, int y2,
+                    int radius, int *color, int colorSize, int width,
+                    int height, int channels) {
     for (int dy = min(y1, y2); dy < max(y1, y2); dy++) {
         for (int dx = min(x1, x2); dx < max(x1, x2); dx++) {
             int interpolatedY = (y1 * (x2 - dx) + y2 * (dx - x1)) / (x2 - x1);
@@ -94,8 +103,9 @@ void drawLineOnHost(unsigned char *data, int x1, int y1, int x2, int y2, int rad
     }
 }
 
-__global__ void drawLineOnDevice(unsigned char *data, int x1, int y1, int x2, int y2, int radius, int *color,
-                                 int colorSize, int width, int height, int channels) {
+__global__ void drawLineOnDevice(unsigned char *data, int x1, int y1, int x2,
+                                 int y2, int radius, int *color, int colorSize,
+                                 int width, int height, int channels) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
     // Check for overflow.
@@ -108,7 +118,8 @@ __global__ void drawLineOnDevice(unsigned char *data, int x1, int y1, int x2, in
 
     // Check for boundaries.
     int interpolatedY = (y1 * (x2 - dx) + y2 * (dx - x1)) / (x2 - x1);
-    if (dx < min(x1, x2) or dx >= max(x1, x2) or dy < min(y1, y2) or dy >= max(y1, y2) or interpolatedY - radius > dy or
+    if (dx < min(x1, x2) or dx >= max(x1, x2) or dy < min(y1, y2) or
+        dy >= max(y1, y2) or interpolatedY - radius > dy or
         interpolatedY + radius < dy) {
         return;
     }
@@ -121,8 +132,8 @@ __global__ void drawLineOnDevice(unsigned char *data, int x1, int y1, int x2, in
     }
 }
 
-void drawPointOnHost(unsigned char *data, int x, int y, int radius, int *color, int colorSize, int width, int height,
-                     int channels) {
+void drawPointOnHost(unsigned char *data, int x, int y, int radius, int *color,
+                     int colorSize, int width, int height, int channels) {
     for (int dy = max(0, y - radius); dy < y + radius; dy++) {
         for (int dx = max(0, x - radius); dx < x + radius; dx++) {
             int index = (dx * width + dy) * channels;
@@ -136,7 +147,8 @@ void drawPointOnHost(unsigned char *data, int x, int y, int radius, int *color, 
     }
 }
 
-__global__ void drawPointOnDevice(unsigned char *data, int x, int y, int radius, int *color, int colorSize, int width,
+__global__ void drawPointOnDevice(unsigned char *data, int x, int y, int radius,
+                                  int *color, int colorSize, int width,
                                   int height, int channels) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -149,7 +161,8 @@ __global__ void drawPointOnDevice(unsigned char *data, int x, int y, int radius,
     int dy = (i % width);
 
     // Check for point boundaries.
-    if (dy < y - radius or dy >= y + radius or dx < x - radius or dx >= x + radius) {
+    if (dy < y - radius or dy >= y + radius or dx < x - radius or
+        dx >= x + radius) {
         return;
     }
 
@@ -161,7 +174,8 @@ __global__ void drawPointOnDevice(unsigned char *data, int x, int y, int radius,
     }
 }
 
-void differenceOnHost(unsigned char *dst, unsigned char *src, const int width, const int height, const int channels) {
+void differenceOnHost(unsigned char *dst, unsigned char *src, const int width,
+                      const int height, const int channels) {
     for (int y = 0; y < width; y++) {
         for (int x = 0; x < height; x++) {
             for (int c = 0; c < channels; c++) {
@@ -176,7 +190,8 @@ void differenceOnHost(unsigned char *dst, unsigned char *src, const int width, c
     }
 }
 
-__global__ void differenceOnDevice(unsigned char *dst, unsigned char *src, const int width, const int height,
+__global__ void differenceOnDevice(unsigned char *dst, unsigned char *src,
+                                   const int width, const int height,
                                    const int channels) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -192,7 +207,8 @@ __global__ void differenceOnDevice(unsigned char *dst, unsigned char *src, const
     }
 }
 
-void cornerScoreOnHost(unsigned char *gradX, unsigned char *gradY, float *R, int width, int height) {
+void cornerScoreOnHost(unsigned char *gradX, unsigned char *gradY, float *R,
+                       int width, int height) {
     const int windowSide = 3;
     const int windowMargin = int((windowSide - 1) / 2);
 
@@ -202,7 +218,8 @@ void cornerScoreOnHost(unsigned char *gradX, unsigned char *gradY, float *R, int
 
         // Check for out-of-bound coordinates.
         R[i] = 0;
-        if (x < windowMargin or y < windowMargin or x > height - windowMargin - 1 or y > width - windowMargin - 1) {
+        if (x < windowMargin or y < windowMargin or
+            x > height - windowMargin - 1 or y > width - windowMargin - 1) {
             continue;
         }
 
@@ -226,13 +243,20 @@ void cornerScoreOnHost(unsigned char *gradX, unsigned char *gradY, float *R, int
         sumOfMatmulOnHost(&M[3], Iy, Iy, windowSide);
 
         // Evaluate the pixel score.
-        float lambda1 = ((M[0] + M[3]) + sqrt(pow(-M[0] - M[3], 2) - 4 * (M[0] * M[3] - M[1] * M[2]))) / 2;
-        float lambda2 = ((M[0] + M[3]) - sqrt(pow(-M[0] - M[3], 2) - 4 * (M[0] * M[3] - M[1] * M[2]))) / 2;
+        float lambda1 =
+            ((M[0] + M[3]) +
+             sqrt(pow(-M[0] - M[3], 2) - 4 * (M[0] * M[3] - M[1] * M[2]))) /
+            2;
+        float lambda2 =
+            ((M[0] + M[3]) -
+             sqrt(pow(-M[0] - M[3], 2) - 4 * (M[0] * M[3] - M[1] * M[2]))) /
+            2;
         R[i] = min(lambda1, lambda2);
     }
 }
 
-__global__ void cornerScoreOnDevice(unsigned char *gradX, unsigned char *gradY, float *R, int width, int height) {
+__global__ void cornerScoreOnDevice(unsigned char *gradX, unsigned char *gradY,
+                                    float *R, int width, int height) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
     const int windowSide = 3;
@@ -248,7 +272,8 @@ __global__ void cornerScoreOnDevice(unsigned char *gradX, unsigned char *gradY, 
 
     // Check for out-of-bound coordinates.
     R[i] = 0;
-    if (x < windowMargin or y < windowMargin or x > height - windowMargin - 1 or y > width - windowMargin - 1) {
+    if (x < windowMargin or y < windowMargin or x > height - windowMargin - 1 or
+        y > width - windowMargin - 1) {
         return;
     }
 
@@ -275,14 +300,19 @@ __global__ void cornerScoreOnDevice(unsigned char *gradX, unsigned char *gradY, 
     delete[] Iy;
 
     // Evaluate the pixel score.
-    float lambda1 = ((M[0] + M[3]) + sqrt(pow(-M[0] - M[3], 2) - 4 * (M[0] * M[3] - M[1] * M[2]))) / 2;
-    float lambda2 = ((M[0] + M[3]) - sqrt(pow(-M[0] - M[3], 2) - 4 * (M[0] * M[3] - M[1] * M[2]))) / 2;
+    float lambda1 = ((M[0] + M[3]) + sqrt(pow(-M[0] - M[3], 2) -
+                                          4 * (M[0] * M[3] - M[1] * M[2]))) /
+                    2;
+    float lambda2 = ((M[0] + M[3]) - sqrt(pow(-M[0] - M[3], 2) -
+                                          4 * (M[0] * M[3] - M[1] * M[2]))) /
+                    2;
     R[i] = min(lambda1, lambda2);
 
     delete[] M;
 }
 
-void histogramOnHost(unsigned char *dst, unsigned char *src, const int width, const int height, const int channels) {
+void histogramOnHost(unsigned char *dst, unsigned char *src, const int width,
+                     const int height, const int channels) {
     for (int y = 0; y < width; y++) {
         for (int x = 0; x < height; x++) {
             for (int c = 0; c < channels; c++) {
@@ -295,7 +325,8 @@ void histogramOnHost(unsigned char *dst, unsigned char *src, const int width, co
     }
 }
 
-__global__ void histogramOnDevice(unsigned char *dst, unsigned char *src, const int width, const int height,
+__global__ void histogramOnDevice(unsigned char *dst, unsigned char *src,
+                                  const int width, const int height,
                                   const int channels) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -318,15 +349,17 @@ __global__ void histogramOnDevice(unsigned char *dst, unsigned char *src, const 
     }
 }
 
-void rotateOnHost(unsigned char *dst, unsigned char *src, const double radian, const int width, const int height,
-                  const int channels) {
+void rotateOnHost(unsigned char *dst, unsigned char *src, const double radian,
+                  const int width, const int height, const int channels) {
     for (int y = 0; y < width; y++) {
         for (int x = 0; x < height; x++) {
             // Evaluate the source pixels.
             int x_center = x - round(height / 2.0);
             int y_center = y - round(width / 2.0);
-            double xa = x_center * cos(-radian) - y_center * sin(-radian) + round(height / 2.0);
-            double ya = x_center * sin(-radian) + y_center * cos(-radian) + round(width / 2.0);
+            double xa = x_center * cos(-radian) - y_center * sin(-radian) +
+                        round(height / 2.0);
+            double ya = x_center * sin(-radian) + y_center * cos(-radian) +
+                        round(width / 2.0);
 
             // Check for out-of-bound coordinates.
             if (xa < 0 or xa > height or ya < 0 or ya > width) {
@@ -365,7 +398,8 @@ void rotateOnHost(unsigned char *dst, unsigned char *src, const double radian, c
     }
 }
 
-__global__ void rotateOnDevice(unsigned char *dst, unsigned char *src, const double radian, const int width,
+__global__ void rotateOnDevice(unsigned char *dst, unsigned char *src,
+                               const double radian, const int width,
                                const int height, const int channels) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -380,8 +414,10 @@ __global__ void rotateOnDevice(unsigned char *dst, unsigned char *src, const dou
     // Evaluate the source pixels.
     int x_center = x - round(height / 2.0);
     int y_center = y - round(width / 2.0);
-    double xa = x_center * cos(-radian) - y_center * sin(-radian) + round(height / 2.0);
-    double ya = x_center * sin(-radian) + y_center * cos(-radian) + round(width / 2.0);
+    double xa =
+        x_center * cos(-radian) - y_center * sin(-radian) + round(height / 2.0);
+    double ya =
+        x_center * sin(-radian) + y_center * cos(-radian) + round(width / 2.0);
 
     // Check for out-of-bound coordinates.
     if (xa < 0 or xa > height or ya < 0 or ya > width) {
@@ -398,11 +434,10 @@ __global__ void rotateOnDevice(unsigned char *dst, unsigned char *src, const dou
         int ib = channels * (x * width + y) + c;
 
         // Evaluate the four pixels given xs and ys roundings.
-        int ia[4] = {
-            channels * (int(floor(xa)) * width + int(floor(ya))) + c,
-            channels * (int(floor(xa)) * width + int(ceil(ya))) + c,
-            channels * (int(ceil(xa)) * width + int(floor(ya))) + c,
-            channels * (int(ceil(xa)) * width + int(ceil(ya))) + c};
+        int ia[4] = {channels * (int(floor(xa)) * width + int(floor(ya))) + c,
+                     channels * (int(floor(xa)) * width + int(ceil(ya))) + c,
+                     channels * (int(ceil(xa)) * width + int(floor(ya))) + c,
+                     channels * (int(ceil(xa)) * width + int(ceil(ya))) + c};
 
         // Evaluate the average value of the destination pixel.
         float sum = 0.0;
@@ -418,11 +453,12 @@ __global__ void rotateOnDevice(unsigned char *dst, unsigned char *src, const dou
     }
 }
 
-void scaleOnHost(unsigned char *dst, unsigned char *src, const double ratio, const int width, const int height, const int channels) {
+void scaleOnHost(unsigned char *dst, unsigned char *src, const double ratio,
+                 const int width, const int height, const int channels) {
     int newWidth = width * ratio;
     int newHeight = height * ratio;
-    float inverseRatio = 1.0/ratio;
-    
+    float inverseRatio = 1.0 / ratio;
+
     for (int y = 0; y < newWidth; y++) {
         for (int x = 0; x < newHeight; x++) {
             for (int c = 0; c < channels; c++) {
@@ -431,8 +467,11 @@ void scaleOnHost(unsigned char *dst, unsigned char *src, const double ratio, con
 
                 for (int dy = -1; dy < 2; dy++) {
                     for (int dx = -1; dx < 2; dx++) {
-                        int oldI = ((int(inverseRatio * x) + dx) * width + (int(inverseRatio * y) + dy)) * channels + c;
-                        float weight = 1/(pow(2, 2+abs(dx)+abs(dy)));
+                        int oldI = ((int(inverseRatio * x) + dx) * width +
+                                    (int(inverseRatio * y) + dy)) *
+                                       channels +
+                                   c;
+                        float weight = 1 / (pow(2, 2 + abs(dx) + abs(dy)));
 
                         if (oldI < 0 or oldI > width * height * channels) {
                             continue;
@@ -446,12 +485,14 @@ void scaleOnHost(unsigned char *dst, unsigned char *src, const double ratio, con
     }
 }
 
-__global__ void scaleOnDevice(unsigned char *dst, unsigned char *src, const double ratio, const int width, const int height, const int channels) {
+__global__ void scaleOnDevice(unsigned char *dst, unsigned char *src,
+                              const double ratio, const int width,
+                              const int height, const int channels) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
     int newWidth = width * ratio;
     int newHeight = height * ratio;
-    float inverseRatio = 1.0/ratio;
+    float inverseRatio = 1.0 / ratio;
 
     // Check for overflow.
     if (i > newWidth * newHeight) {
@@ -466,8 +507,11 @@ __global__ void scaleOnDevice(unsigned char *dst, unsigned char *src, const doub
 
         for (int dy = -1; dy < 2; dy++) {
             for (int dx = -1; dx < 2; dx++) {
-                int src_i = ((int(inverseRatio * x) + dx) * width + (int(inverseRatio * y) + dy)) * channels + c;
-                float weight = 1/(pow(2, 2+abs(dx)+abs(dy)));
+                int src_i = ((int(inverseRatio * x) + dx) * width +
+                             (int(inverseRatio * y) + dy)) *
+                                channels +
+                            c;
+                float weight = 1 / (pow(2, 2 + abs(dx) + abs(dy)));
 
                 if (src_i < 0 or src_i > width * height * channels) {
                     continue;
@@ -479,7 +523,8 @@ __global__ void scaleOnDevice(unsigned char *dst, unsigned char *src, const doub
     }
 }
 
-void transposeOnHost(unsigned char *data, const int width, const int height, const int channels) {
+void transposeOnHost(unsigned char *data, const int width, const int height,
+                     const int channels) {
     for (int y = 0; y < width; y++) {
         for (int x = 0; x < height; x++) {
             for (int c = 0; c < channels; c++) {
@@ -498,7 +543,8 @@ void transposeOnHost(unsigned char *data, const int width, const int height, con
     }
 }
 
-__global__ void transposeOnDevice(unsigned char *data, const int width, const int height, const int channels) {
+__global__ void transposeOnDevice(unsigned char *data, const int width,
+                                  const int height, const int channels) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
     // Check for overflow.
@@ -540,7 +586,8 @@ void sumOfMatmulOnHost(float *total, float *A, float *B, int side) {
     }
 }
 
-__device__ void sumOfMatmulOnDevice(float *total, float *A, float *B, int side) {
+__device__ void sumOfMatmulOnDevice(float *total, float *A, float *B,
+                                    int side) {
     *total = 0;
 
     for (int i = 0; i < side * side; i++) {

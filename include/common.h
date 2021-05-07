@@ -17,4 +17,4 @@ size_t len(char **array);
 
 size_t len(const char **array);
 
-#endif  //IMAGINE_COMMON_H
+#endif // IMAGINE_COMMON_H

@@ -7,7 +7,8 @@ void Kernel::Gaussian(float **kernel, int *kernelSide) {
         *kernelSide = side;
     }
 
-    *kernel = new float[side * side]{0.0625, 0.125, 0.0625, 0.125, 0.250, 0.125, 0.0625, 0.125, 0.0625};
+    *kernel = new float[side * side]{0.0625, 0.125,  0.0625, 0.125, 0.250,
+                                     0.125,  0.0625, 0.125,  0.0625};
 }
 
 void Kernel::SobelX(float **kernel, int *kernelSide) {
@@ -17,7 +18,8 @@ void Kernel::SobelX(float **kernel, int *kernelSide) {
         *kernelSide = side;
     }
 
-    *kernel = new float[side * side]{0.111, 0, -0.111, 0.222, 0, -0.222, 0.111, 0, -0.111};
+    *kernel = new float[side * side]{0.111,  0,     -0.111, 0.222, 0,
+                                     -0.222, 0.111, 0,      -0.111};
 }
 
 void Kernel::SobelY(float **kernel, int *kernelSide) {
@@ -26,5 +28,6 @@ void Kernel::SobelY(float **kernel, int *kernelSide) {
     if (kernelSide != nullptr) {
         *kernelSide = side;
     }
-    *kernel = new float[side * side]{0.111, 0.222, 0.111, 0, 0, 0, -0.111, -0.222, -0.111};
+    *kernel = new float[side * side]{0.111, 0.222,  0.111,  0,     0,
+                                     0,     -0.111, -0.222, -0.111};
 }
