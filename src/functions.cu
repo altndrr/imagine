@@ -602,3 +602,24 @@ __device__ void sumOfMatmulOnDevice(float *total, float *A, float *B,
         }
     }
 }
+
+float sumOfSquareDifferencesOnHost(unsigned char *patch1, unsigned char *patch2,
+                                   int patchSide) {
+    float sse = 0.0;
+    for (int i = 0; i < patchSide * patchSide; i++) {
+        sse += pow(float(patch1[i] - patch2[i]), 2);
+    }
+
+    return sse;
+}
+
+__device__ float sumOfSquareDifferencesOnDevice(unsigned char *patch1,
+                                                unsigned char *patch2,
+                                                int patchSide) {
+    float sse = 0.0;
+    for (int i = 0; i < patchSide * patchSide; i++) {
+        sse += pow(float(patch1[i] - patch2[i]), 2);
+    }
+
+    return sse;
+}

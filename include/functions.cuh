@@ -71,4 +71,11 @@ void sumOfMatmulOnHost(float *total, float *A, float *B, int side);
 
 __device__ void sumOfMatmulOnDevice(float *total, float *A, float *B, int side);
 
+float sumOfSquareDifferencesOnHost(unsigned char *patch1, unsigned char *patch2,
+                                   int patchSide);
+
+__device__ float sumOfSquareDifferencesOnDevice(unsigned char *patch1,
+                                                unsigned char *patch2,
+                                                int patchSide);
+
 #endif // IMAGINE_FUNCTIONS_H
