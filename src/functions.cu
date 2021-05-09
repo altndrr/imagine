@@ -500,7 +500,7 @@ __global__ void scaleOnDevice(unsigned char *dst, unsigned char *src,
     }
 
     int x = (int)i / newWidth;
-    int y = (i % newHeight);
+    int y = (i % newWidth);
 
     for (int c = 0; c < channels; c++) {
         float tempValue = 0.0;

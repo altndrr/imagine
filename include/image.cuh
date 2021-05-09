@@ -8,9 +8,7 @@
 
 class Image {
 public:
-    Image(const char *filename, bool grayscale);
-
-    Image(const char *filename);
+    Image(const char *filename, bool grayscale = false);
 
     Image(const Image &obj);
 

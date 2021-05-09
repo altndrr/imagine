@@ -41,8 +41,6 @@ Image::Image(const char *filename, bool grayscale) {
     stbi_image_free(data);
 }
 
-Image::Image(const char *filename) : Image(filename, false) { ; }
-
 Image::Image(const Image &obj) {
     _device = obj._device;
     _filename = obj._filename;
