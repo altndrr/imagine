@@ -78,4 +78,11 @@ __device__ float sumOfSquareDifferencesOnDevice(unsigned char *patch1,
                                                 unsigned char *patch2,
                                                 int patchSide);
 
+void extractPatchOnHost(unsigned char *patch, unsigned char *data,
+                        int centerIndex, int patchSide, int width, int height);
+
+__device__ void extractPatchOnDevice(unsigned char *patch, unsigned char *data,
+                                     int centerIndex, int patchSide, int width,
+                                     int height);
+
 #endif // IMAGINE_FUNCTIONS_H

@@ -623,3 +623,42 @@ __device__ float sumOfSquareDifferencesOnDevice(unsigned char *patch1,
 
     return sse;
 }
+
+void extractPatchOnHost(unsigned char *patch, unsigned char *data,
+                        int centerIndex, int patchSide, int width, int height) {
+    const int patchMargin = int((patchSide - 1) / 2);
+
+    for (int pi = 0; pi < patchSide * patchSide; pi++) {
+        int x = (int)centerIndex / width;
+        int y = centerIndex % width;
+        int dx = ((int)pi / patchSide) - patchMargin;
+        int dy = (pi % patchSide) - patchMargin;
+        int di = (x + dx) * width + (y + dy);
+
+        if (di < 0 or di > width * height) {
+            patch[pi] = 0;
+        } else {
+            patch[pi] = data[di];
+        }
+    }
+}
+
+__device__ void extractPatchOnDevice(unsigned char *patch, unsigned char *data,
+                                     int centerIndex, int patchSide, int width,
+                                     int height) {
+    const int patchMargin = int((patchSide - 1) / 2);
+
+    for (int pi = 0; pi < patchSide * patchSide; pi++) {
+        int x = (int)centerIndex / width;
+        int y = centerIndex % width;
+        int dx = ((int)pi / patchSide) - patchMargin;
+        int dy = (pi % patchSide) - patchMargin;
+        int di = (x + dx) * width + (y + dy);
+
+        if (di < 0 or di > width * height) {
+            patch[pi] = 0;
+        } else {
+            patch[pi] = data[di];
+        }
+    }
+}
