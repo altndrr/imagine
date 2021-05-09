@@ -40,6 +40,9 @@ public:
 
     void setDevice(const char *device);
 
+    void calcOpticalFlow(int *currentCorners, Image *previousFrame,
+                         int *corners, int maxCorners, int levels = 2);
+
     void convolution(float *kernel, int kernelSide);
 
     void drawLine(int index1, int index2, int radius, int *color,

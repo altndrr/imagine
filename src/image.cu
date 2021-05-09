@@ -181,6 +181,102 @@ void Image::setDevice(const char *device) {
     }
 }
 
+void Image::calcOpticalFlow(int *currentCorners, Image *previousFrame,
+                            int *corners, int maxCorners, int levels) {
+    Image gray(getFilename(), true);
+    Image prevGray(previousFrame->getFilename(), true);
+    gray.setDevice(getDevice());
+    prevGray.setDevice(getDevice());
+
+    if (strcmp(_device, _validDevices[0]) == 0) {
+        unsigned char *currPyramidalScales[levels];
+        unsigned char *prevPyramidalScales[levels];
+
+        // Create the pyramidal scales.
+        for (int l = 0; l < levels; l++) {
+            int levelWidth = gray.getWidth() / pow(2, l);
+            int levelHeight = gray.getHeight() / pow(2, l);
+            currPyramidalScales[l] = new unsigned char[gray.getSize()];
+            prevPyramidalScales[l] = new unsigned char[prevGray.getSize()];
+
+            if (l == 0) {
+                for (int i = 0; i < gray.getSize(); i++) {
+                    currPyramidalScales[l][i] = gray.getData()[i];
+                    prevPyramidalScales[l][i] = prevGray.getData()[i];
+                }
+            } else {
+                scaleOnHost(currPyramidalScales[l], currPyramidalScales[l - 1],
+                            0.5, levelWidth * 2, levelHeight * 2, 1);
+                scaleOnHost(prevPyramidalScales[l], prevPyramidalScales[l - 1],
+                            0.5, levelWidth * 2, levelHeight * 2, 1);
+            }
+        }
+
+        opticalFLowOnHost(currentCorners, corners, maxCorners,
+                          currPyramidalScales, prevPyramidalScales, levels,
+                          gray.getWidth(), gray.getHeight());
+    } else {
+        // Copy corner arrays to device.
+        size_t cornersBytes = maxCorners * sizeof(int);
+        int *d_corners, *d_currCorners;
+        cudaMalloc((int **)&d_corners, cornersBytes);
+        cudaMalloc((int **)&d_currCorners, cornersBytes);
+        cudaMemcpy(d_corners, corners, cornersBytes, cudaMemcpyHostToDevice);
+
+        // Create the pyramidal scales.
+        size_t pyramidBytes = gray.getSize() * sizeof(unsigned char);
+        unsigned char *currPyramidalScales, *prevPyramidalScales;
+        cudaMalloc((unsigned char **)&currPyramidalScales,
+                   levels * pyramidBytes);
+        cudaMalloc((unsigned char **)&prevPyramidalScales,
+                   levels * pyramidBytes);
+        int copyBlockSize = 1024;
+        dim3 copyThreads(copyBlockSize, 1);
+        dim3 copyBlocks(
+            (gray.getWidth() * gray.getHeight() + copyThreads.x - 1) /
+                copyThreads.x,
+            1);
+
+        for (int l = 0; l < levels; l++) {
+            int levelWidth = gray.getWidth() / pow(2, l);
+            int levelHeight = gray.getHeight() / pow(2, l);
+
+            if (l == 0) {
+                cudaMemcpy(currPyramidalScales, gray.getData(), pyramidBytes,
+                           cudaMemcpyDeviceToDevice);
+                cudaMemcpy(prevPyramidalScales, prevGray.getData(),
+                           pyramidBytes, cudaMemcpyDeviceToDevice);
+            } else {
+                scaleOnDevice<<<copyBlocks, copyThreads>>>(
+                    currPyramidalScales + l * gray.getSize(),
+                    currPyramidalScales + (l - 1) * gray.getSize(), 0.5,
+                    levelWidth * 2, levelHeight * 2, 1);
+                scaleOnDevice<<<copyBlocks, copyThreads>>>(
+                    prevPyramidalScales + l * gray.getSize(),
+                    prevPyramidalScales + (l - 1) * gray.getSize(), 0.5,
+                    levelWidth * 2, levelHeight * 2, 1);
+            }
+        }
+
+        int blockSize = 1024;
+        dim3 threads(blockSize, 1);
+        dim3 blocks((maxCorners + copyThreads.x - 1) / copyThreads.x, 1);
+        opticalFLowOnDevice<<<blocks, threads>>>(
+            d_currCorners, d_corners, maxCorners, currPyramidalScales,
+            prevPyramidalScales, levels, gray.getSize(), gray.getWidth(),
+            gray.getHeight());
+
+        cudaMemcpy(currentCorners, d_currCorners, cornersBytes,
+                   cudaMemcpyDeviceToHost);
+
+        // Free memory.
+        cudaFree(d_corners);
+        cudaFree(d_currCorners);
+        cudaFree(currPyramidalScales);
+        cudaFree(prevPyramidalScales);
+    }
+}
+
 void Image::convolution(float *kernel, int kernelSide) {
     unsigned char *dataCopy;
 

@@ -349,6 +349,125 @@ __global__ void histogramOnDevice(unsigned char *dst, unsigned char *src,
     }
 }
 
+void opticalFLowOnHost(int *currentCorners, int *corners, int maxCorners,
+                       unsigned char **currPyramidalScales,
+                       unsigned char **prevPyramidalScales, int levels,
+                       int width0, int height0) {
+    const int patchSide = 5;
+    const int windowSide = 9;
+    const int windowMargin = int((windowSide - 1) / 2);
+    unsigned char *prevPatch = new unsigned char[patchSide * patchSide];
+    unsigned char *currPatch = new unsigned char[patchSide * patchSide];
+
+    for (int l = levels - 1; l >= 0; l--) {
+        int width = width0 / pow(2, l);
+        int height = height0 / pow(2, l);
+        float minSse;
+
+        for (int i = 0; i < maxCorners; i++) {
+            // Downscale corner from the previous frame.
+            int lx = (corners[i] / width0) * pow(2, -l);
+            int ly = (corners[i] % width0) * pow(2, -l);
+
+            int prevCorner = int(lx * width + ly);
+            minSse = 100;
+
+            if (l == levels - 1) {
+                currentCorners[i] = prevCorner;
+            } else {
+                // Upscale corner from the previous layer.
+                int ux = int(currentCorners[i] / (width * 0.5)) * 2;
+                int uy = (currentCorners[i] % int((width * 0.5))) * 2;
+                currentCorners[i] = int(ux * width + uy);
+            }
+
+            extractPatchOnHost(prevPatch, prevPyramidalScales[l], prevCorner,
+                               patchSide, width, height);
+
+            int x = (int)currentCorners[i] / width;
+            int y = currentCorners[i] % width;
+            for (int wi = 0; wi < windowSide * windowSide; wi++) {
+                int dx = ((int)wi / windowSide) - windowMargin;
+                int dy = (wi % windowSide) - windowMargin;
+                int di = (x + dx) * width + (y + dy);
+
+                extractPatchOnHost(currPatch, currPyramidalScales[l], di,
+                                   patchSide, width, height);
+
+                float sse = sumOfSquareDifferencesOnHost(prevPatch, currPatch,
+                                                         patchSide);
+
+                if (sse < minSse) {
+                    currentCorners[i] = di;
+                    minSse = sse;
+                }
+            }
+        }
+    }
+}
+
+__global__ void opticalFLowOnDevice(int *currentCorners, int *corners,
+                                    int maxCorners,
+                                    unsigned char *currPyramidalScales,
+                                    unsigned char *prevPyramidalScales,
+                                    int levels, int offsetSize, int width0,
+                                    int height0) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    const int patchSide = 5;
+    const int windowSide = 9;
+    const int windowMargin = int((windowSide - 1) / 2);
+    unsigned char *prevPatch = new unsigned char[patchSide * patchSide];
+    unsigned char *currPatch = new unsigned char[patchSide * patchSide];
+
+    for (int l = levels - 1; l >= 0; l--) {
+        int width = width0 / pow(2, l);
+        int height = height0 / pow(2, l);
+        float minSse = 100;
+
+        // Downscale corner from the previous frame.
+        int lx = (corners[i] / width0) * pow(2, -l);
+        int ly = (corners[i] % width0) * pow(2, -l);
+
+        int prevCorner = int(lx * width + ly);
+
+        if (l == levels - 1) {
+            currentCorners[i] = prevCorner;
+        } else {
+            // Upscale corner from the previous layer.
+            int ux = int(currentCorners[i] / (width * 0.5)) * 2;
+            int uy = (currentCorners[i] % int((width * 0.5))) * 2;
+            currentCorners[i] = int(ux * width + uy);
+        }
+
+        extractPatchOnDevice(prevPatch, prevPyramidalScales + l * offsetSize,
+                             prevCorner, patchSide, width, height);
+
+        int x = (int)currentCorners[i] / width;
+        int y = currentCorners[i] % width;
+        for (int wi = 0; wi < windowSide * windowSide; wi++) {
+            int dx = ((int)wi / windowSide) - windowMargin;
+            int dy = (wi % windowSide) - windowMargin;
+            int di = (x + dx) * width + (y + dy);
+
+            extractPatchOnDevice(currPatch,
+                                 currPyramidalScales + l * offsetSize, di,
+                                 patchSide, width, height);
+
+            float sse =
+                sumOfSquareDifferencesOnDevice(prevPatch, currPatch, patchSide);
+
+            if (sse < minSse) {
+                currentCorners[i] = di;
+                minSse = sse;
+            }
+        }
+    }
+
+    delete[] prevPatch;
+    delete[] currPatch;
+}
+
 void rotateOnHost(unsigned char *dst, unsigned char *src, const double radian,
                   const int width, const int height, const int channels) {
     for (int y = 0; y < width; y++) {

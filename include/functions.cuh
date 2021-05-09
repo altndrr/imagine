@@ -47,6 +47,18 @@ __global__ void histogramOnDevice(unsigned char *dst, unsigned char *src,
                                   const int width, const int height,
                                   const int channels);
 
+void opticalFLowOnHost(int *currentCorners, int *corners, int maxCorners,
+                       unsigned char **currPyramidalScales,
+                       unsigned char **prevPyramidalScales, int levels,
+                       int width0, int height0);
+
+__global__ void opticalFLowOnDevice(int *currentCorners, int *corners,
+                                    int maxCorners,
+                                    unsigned char *currPyramidalScales,
+                                    unsigned char *prevPyramidalScales,
+                                    int levels, int offsetSize, int width0,
+                                    int height0);
+
 void rotateOnHost(unsigned char *dst, unsigned char *src, const double radian,
                   const int width, const int height, const int channels);
 
