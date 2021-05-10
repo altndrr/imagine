@@ -243,14 +243,10 @@ void cornerScoreOnHost(unsigned char *gradX, unsigned char *gradY, float *R,
         sumOfMatmulOnHost(&M[3], Iy, Iy, windowSide);
 
         // Evaluate the pixel score.
-        float lambda1 =
-            ((M[0] + M[3]) +
-             sqrt(pow(-M[0] - M[3], 2) - 4 * (M[0] * M[3] - M[1] * M[2]))) /
-            2;
-        float lambda2 =
-            ((M[0] + M[3]) -
-             sqrt(pow(-M[0] - M[3], 2) - 4 * (M[0] * M[3] - M[1] * M[2]))) /
-            2;
+        float m = (M[0] + M[3]) / 2;
+        float p = (M[0] * M[3]) - (M[1] * M[2]);
+        float lambda1 = m + sqrt(m * m - p);
+        float lambda2 = m - sqrt(m * m - p);
         R[i] = min(lambda1, lambda2);
     }
 }
@@ -300,12 +296,10 @@ __global__ void cornerScoreOnDevice(unsigned char *gradX, unsigned char *gradY,
     delete[] Iy;
 
     // Evaluate the pixel score.
-    float lambda1 = ((M[0] + M[3]) + sqrt(pow(-M[0] - M[3], 2) -
-                                          4 * (M[0] * M[3] - M[1] * M[2]))) /
-                    2;
-    float lambda2 = ((M[0] + M[3]) - sqrt(pow(-M[0] - M[3], 2) -
-                                          4 * (M[0] * M[3] - M[1] * M[2]))) /
-                    2;
+    float m = (M[0] + M[3]) / 2;
+    float p = (M[0] * M[3]) - (M[1] * M[2]);
+    float lambda1 = m + sqrt(m * m - p);
+    float lambda2 = m - sqrt(m * m - p);
     R[i] = min(lambda1, lambda2);
 
     delete[] M;
