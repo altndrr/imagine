@@ -64,6 +64,8 @@ public:
 
     void scale(float ratio);
 
+    void translate(int px, int py);
+
     void transpose();
 
 private:

@@ -636,6 +636,69 @@ __global__ void scaleOnDevice(unsigned char *dst, unsigned char *src,
     }
 }
 
+void translateOnHost(unsigned char *dst, unsigned char *src, int px, int py,
+                     const int width, const int height, const int channels) {
+    for (int y = 0; y < width; y++) {
+        for (int x = 0; x < height; x++) {
+            // Evaluate the source pixels.
+            int xa = x - px;
+            int ya = y - py;
+
+            // Check for out-of-bound coordinates.
+            if (xa < 0 or xa > height or ya < 0 or ya > width) {
+                // Set pixels to black and exit
+                for (int c = 0; c < channels; c++) {
+                    int ib = channels * (x * width + y) + c;
+                    dst[ib] = 0;
+                }
+
+                continue;
+            }
+
+            for (int c = 0; c < channels; c++) {
+                int ia = channels * (xa * width + ya) + c;
+                int ib = channels * (x * width + y) + c;
+                dst[ib] = src[ia];
+            }
+        }
+    }
+}
+
+__global__ void translateOnDevice(unsigned char *dst, unsigned char *src,
+                                  int px, int py, const int width,
+                                  const int height, const int channels) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Check for overflow.
+    if (i >= width * height) {
+        return;
+    }
+
+    int x = (int)i / width;
+    int y = (i % width);
+
+    // Evaluate the source pixels.
+    int xa = x - px;
+    int ya = y - py;
+
+    // Check for out-of-bound coordinates.
+    if (xa < 0 or xa > height or ya < 0 or ya > width) {
+        // Set pixels to black and exit.
+        for (int c = 0; c < channels; c++) {
+            int ib = channels * (x * width + y) + c;
+            dst[ib] = 0;
+        }
+
+        return;
+    }
+
+    for (int c = 0; c < channels; c++) {
+        int ia = channels * (xa * width + ya) + c;
+        int ib = channels * (x * width + y) + c;
+        dst[ib] = src[ia];
+    }
+}
+
 void transposeOnHost(unsigned char *data, const int width, const int height,
                      const int channels) {
     for (int y = 0; y < width; y++) {

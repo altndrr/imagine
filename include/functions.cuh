@@ -73,6 +73,13 @@ __global__ void scaleOnDevice(unsigned char *dst, unsigned char *src,
                               const double ratio, const int width,
                               const int height, const int channels);
 
+void translateOnHost(unsigned char *dst, unsigned char *src, int px, int py,
+                     const int width, const int height, const int channels);
+
+__global__ void translateOnDevice(unsigned char *dst, unsigned char *src,
+                                  int px, int py, const int width,
+                                  const int height, const int channels);
+
 void transposeOnHost(unsigned char *data, const int width, const int height,
                      const int channels);
 
