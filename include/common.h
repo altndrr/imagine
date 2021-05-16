@@ -17,4 +17,10 @@ size_t len(char **array);
 
 size_t len(const char **array);
 
+std::string zfill(int num, int size);
+
+void cumsum(float *results, float *values, int dim);
+
+void movingAverage(float *results, float *values, int dim, int windowSide = 5);
+
 #endif // IMAGINE_COMMON_H

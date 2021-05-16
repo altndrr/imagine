@@ -46,3 +46,44 @@ size_t len(const char **array) {
 
     return ret;
 }
+
+std::string zfill(int num, int size) {
+    int nDigits = 0, no = num;
+    do {
+        no = (int)no / 10;
+        nDigits++;
+    } while (no != 0);
+
+    int lenPadding = size - nDigits;
+    std::string padding;
+    for (int k = 0; k < lenPadding; k++)
+        padding += '0';
+
+    return padding + std::to_string(num).c_str();
+}
+
+void cumsum(float *results, float *values, int dim) {
+    results[0] = values[0];
+
+    for (int i = 1; i < dim; i++) {
+        results[i] = results[i - 1] + values[i];
+    }
+}
+
+void movingAverage(float *results, float *values, int dim, int windowSide) {
+    int windowMargin = int((windowSide - 1) / 2);
+
+    for (int i = 0; i < dim; i++) {
+        float sum = 0.0;
+        int rounds = 0;
+        int minIndex = std::max(0, i - windowMargin);
+        int maxIndex = std::min(dim, i + windowMargin) + 1;
+
+        for (int d = minIndex; d < maxIndex; d++) {
+            sum += values[d];
+            rounds++;
+        }
+
+        results[i] = sum / rounds;
+    }
+}
