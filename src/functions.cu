@@ -848,26 +848,26 @@ void findHomographyRANSACOnHost(float *matrices, float *scores, int maxIter,
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> uniform(0, maxCorners);
 
-    const int n_points = 3;
-    const int space_dim = 2;
+    const int N_POINTS = 3;
+    const int SPACE_DIM = 2;
 
     // Create maxIter models.
-    float *srcTriplet = new float[n_points * space_dim];
-    float *dstTriplet = new float[n_points * space_dim];
-    float *estPoint = new float[space_dim];
-    float *srcPoint = new float[space_dim];
-    float *dstPoint = new float[space_dim];
+    float *srcTriplet = new float[N_POINTS * SPACE_DIM];
+    float *dstTriplet = new float[N_POINTS * SPACE_DIM];
+    float *estPoint = new float[SPACE_DIM];
+    float *srcPoint = new float[SPACE_DIM];
+    float *dstPoint = new float[SPACE_DIM];
     for (int n = 0; n < maxIter; n++) {
-        int offset = n * (n_points * (space_dim + 1));
+        int offset = n * (N_POINTS * (SPACE_DIM + 1));
         scores[n] = INFINITY;
 
         // Select the minimum number of data points to estimate a model.
-        for (int k = 0; k < n_points; k++) {
+        for (int k = 0; k < N_POINTS; k++) {
             int i = uniform(gen);
-            srcTriplet[k * space_dim] = (int)previousCorners[i] / width;
-            srcTriplet[k * space_dim + 1] = previousCorners[i] % width;
-            dstTriplet[k * space_dim] = (int)currentCorners[i] / width;
-            dstTriplet[k * space_dim + 1] = currentCorners[i] % width;
+            srcTriplet[k * SPACE_DIM] = (int)previousCorners[i] / width;
+            srcTriplet[k * SPACE_DIM + 1] = previousCorners[i] % width;
+            dstTriplet[k * SPACE_DIM] = (int)currentCorners[i] / width;
+            dstTriplet[k * SPACE_DIM + 1] = currentCorners[i] % width;
         }
 
         // Estimate the model that fit the hypothetical inliers.
@@ -906,20 +906,20 @@ void findHomographyRANSACOnHost(float *matrices, float *scores, int maxIter,
 }
 
 void estimateTransformOnHost(float *A, float *Ui, float *vi) {
-    const int n_points = 3;
-    const int space_dim = 2;
+    const int N_POINTS = 3;
+    const int SPACE_DIM = 2;
 
     // Create X and Y matrices.
-    float *X = new float[n_points * (space_dim + 1)];
-    float *Y = new float[n_points * (space_dim + 1)];
-    for (int d = 0; d < space_dim + 1; d++) {
-        for (int n = 0; n < n_points; n++) {
-            int i = d * (n_points) + n;
-            int j = n * (space_dim) + d;
+    float *X = new float[N_POINTS * (SPACE_DIM + 1)];
+    float *Y = new float[N_POINTS * (SPACE_DIM + 1)];
+    for (int d = 0; d < SPACE_DIM + 1; d++) {
+        for (int n = 0; n < N_POINTS; n++) {
+            int i = d * (N_POINTS) + n;
+            int j = n * (SPACE_DIM) + d;
 
-            if (d == space_dim) {
+            if (d == SPACE_DIM) {
                 X[i] = 1;
-                Y[i] = int(n >= n_points - 1);
+                Y[i] = int(n >= N_POINTS - 1);
             } else {
                 X[i] = Ui[j];
                 Y[i] = vi[j];
@@ -927,11 +927,11 @@ void estimateTransformOnHost(float *A, float *Ui, float *vi) {
         }
     }
 
-    float *Xi = new float[n_points * (space_dim + 1)];
+    float *Xi = new float[N_POINTS * (SPACE_DIM + 1)];
     invert3x3MatrixOnHost(Xi, X);
 
     // Get the affine transformation matrix.
-    matmulOnHost(A, Y, Xi, n_points);
+    matmulOnHost(A, Y, Xi, N_POINTS);
 
     delete[] X;
     delete[] Y;
@@ -970,9 +970,9 @@ void matmulOnHost(float *C, float *A, float *B, int side) {
 }
 
 void applyTransformOnHost(float *dst, float *src, float *A) {
-    const int space_dim = 2;
+    const int SPACE_DIM = 2;
 
-    for (int i = 0; i < space_dim; i++) {
+    for (int i = 0; i < SPACE_DIM; i++) {
         dst[i] = 0.0;
         dst[i] += src[0] * A[i * 3 + 0];
         dst[i] += src[1] * A[i * 3 + 1];
