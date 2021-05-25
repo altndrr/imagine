@@ -110,12 +110,25 @@ void findHomographyRANSACOnHost(float *matrices, float *scores, int maxIter,
                                 float thresholdError = 5.0,
                                 float minConfidence = 0.95);
 
+__global__ void findHomographyRANSACOnDevice(
+    float *matrices, float *scores, int maxIter, int *currentCorners,
+    int *previousCorners, int maxCorners, int *randomCornerIndices, int width,
+    int height, float thresholdError = 5.0, float minConfidence = 0.95);
+
 void estimateTransformOnHost(float *A, float *Ui, float *vi);
+
+__device__ void estimateTransformOnDevice(float *A, float *Ui, float *vi);
 
 void invert3x3MatrixOnHost(float *Xi, float *X);
 
+__device__ void invert3x3MatrixOnDevice(float *Xi, float *X);
+
 void matmulOnHost(float *C, float *A, float *B, int side);
 
+__device__ void matmulOnDevice(float *C, float *A, float *B, int side);
+
 void applyTransformOnHost(float *dst, float *src, float *A);
+
+__device__ void applyTransformOnDevice(float *dst, float *src, float *A);
 
 #endif // IMAGINE_FUNCTIONS_H

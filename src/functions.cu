@@ -905,6 +905,72 @@ void findHomographyRANSACOnHost(float *matrices, float *scores, int maxIter,
     delete[] dstPoint;
 }
 
+__global__ void findHomographyRANSACOnDevice(
+    float *matrices, float *scores, int maxIter, int *currentCorners,
+    int *previousCorners, int maxCorners, int *randomCornerIndices, int width,
+    int height, float thresholdError, float minConfidence) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i >= maxIter) {
+        return;
+    }
+
+    const int N_POINTS = 3;
+    const int SPACE_DIM = 2;
+
+    // Create maxIter models.
+    float *srcTriplet = new float[N_POINTS * SPACE_DIM];
+    float *dstTriplet = new float[N_POINTS * SPACE_DIM];
+    float *estPoint = new float[SPACE_DIM];
+    float *srcPoint = new float[SPACE_DIM];
+    float *dstPoint = new float[SPACE_DIM];
+
+    int offset = i * (N_POINTS * (SPACE_DIM + 1));
+    scores[i] = INFINITY;
+
+    // Select the minimum number of data points to estimate a model.
+    for (int k = 0; k < N_POINTS; k++) {
+        int index = randomCornerIndices[N_POINTS * i + k];
+        srcTriplet[k * SPACE_DIM] = (int)previousCorners[index] / width;
+        srcTriplet[k * SPACE_DIM + 1] = previousCorners[index] % width;
+        dstTriplet[k * SPACE_DIM] = (int)currentCorners[index] / width;
+        dstTriplet[k * SPACE_DIM + 1] = currentCorners[index] % width;
+    }
+
+    // Estimate the model that fit the hypothetical inliers.
+    estimateTransformOnDevice(matrices + offset, srcTriplet, dstTriplet);
+
+    // Count the points that fit the model and the total error.
+    int nInliers = 0;
+    float totalError = 0.0;
+    for (int index = 0; index < maxCorners; index++) {
+        srcPoint[0] = (int)previousCorners[index] / width;
+        srcPoint[1] = previousCorners[index] % width;
+        dstPoint[0] = (int)currentCorners[index] / width;
+        dstPoint[1] = currentCorners[index] % width;
+
+        // Apply the transform and evaluate the error.
+        applyTransformOnDevice(estPoint, srcPoint, matrices + offset);
+        float reprojError = pow(int(estPoint[0] - dstPoint[0]), 2) +
+                            pow(int(estPoint[1] - dstPoint[1]), 2);
+        nInliers += int(reprojError < thresholdError);
+        totalError += reprojError;
+    }
+
+    // Set the matrix score to the error if the confidence is high
+    // enough.
+    float confidence = (float)nInliers / maxCorners;
+    if (confidence >= minConfidence) {
+        scores[i] = totalError;
+    }
+
+    delete[] srcTriplet;
+    delete[] dstTriplet;
+    delete[] estPoint;
+    delete[] srcPoint;
+    delete[] dstPoint;
+}
+
 void estimateTransformOnHost(float *A, float *Ui, float *vi) {
     const int N_POINTS = 3;
     const int SPACE_DIM = 2;
@@ -938,7 +1004,56 @@ void estimateTransformOnHost(float *A, float *Ui, float *vi) {
     delete[] Xi;
 }
 
+__device__ void estimateTransformOnDevice(float *A, float *Ui, float *vi) {
+    const int N_POINTS = 3;
+    const int SPACE_DIM = 2;
+
+    // Create X and Y matrices.
+    float *X = new float[N_POINTS * (SPACE_DIM + 1)];
+    float *Y = new float[N_POINTS * (SPACE_DIM + 1)];
+    for (int d = 0; d < SPACE_DIM + 1; d++) {
+        for (int n = 0; n < N_POINTS; n++) {
+            int i = d * (N_POINTS) + n;
+            int j = n * (SPACE_DIM) + d;
+
+            if (d == SPACE_DIM) {
+                X[i] = 1;
+                Y[i] = int(n >= N_POINTS - 1);
+            } else {
+                X[i] = Ui[j];
+                Y[i] = vi[j];
+            }
+        }
+    }
+
+    float *Xi = new float[N_POINTS * (SPACE_DIM + 1)];
+    invert3x3MatrixOnDevice(Xi, X);
+
+    // Get the affine transformation matrix.
+    matmulOnDevice(A, Y, Xi, N_POINTS);
+
+    delete[] X;
+    delete[] Y;
+    delete[] Xi;
+}
+
 void invert3x3MatrixOnHost(float *Xi, float *X) {
+    float det = X[0] * (X[4] * X[8] - X[5] * X[7]) -
+                X[1] * (X[3] * X[8] - X[5] * X[6]) +
+                X[2] * (X[3] * X[7] - X[4] * X[6]);
+
+    Xi[0] = +float(X[4] * X[8] - X[5] * X[7]) / det;
+    Xi[1] = -float(X[1] * X[8] - X[2] * X[7]) / det;
+    Xi[2] = +float(X[1] * X[5] - X[2] * X[4]) / det;
+    Xi[3] = -float(X[3] * X[8] - X[5] * X[6]) / det;
+    Xi[4] = +float(X[0] * X[8] - X[2] * X[6]) / det;
+    Xi[5] = -float(X[0] * X[5] - X[2] * X[3]) / det;
+    Xi[6] = +float(X[3] * X[7] - X[4] * X[6]) / det;
+    Xi[7] = -float(X[0] * X[7] - X[1] * X[6]) / det;
+    Xi[8] = +float(X[0] * X[4] - X[1] * X[3]) / det;
+}
+
+__device__ void invert3x3MatrixOnDevice(float *Xi, float *X) {
     float det = X[0] * (X[4] * X[8] - X[5] * X[7]) -
                 X[1] * (X[3] * X[8] - X[5] * X[6]) +
                 X[2] * (X[3] * X[7] - X[4] * X[6]);
@@ -969,7 +1084,32 @@ void matmulOnHost(float *C, float *A, float *B, int side) {
     }
 }
 
+__device__ void matmulOnDevice(float *C, float *A, float *B, int side) {
+    for (int i = 0; i < side * side; i++) {
+        int x = (int)i / side;
+        int y = (i % side);
+
+        C[i] = 0;
+        for (int d = 0; d < side; d++) {
+            int ia = x * side + d;
+            int ib = d * side + y;
+
+            C[i] += A[ia] * B[ib];
+        }
+    }
+}
+
 void applyTransformOnHost(float *dst, float *src, float *A) {
+    const int SPACE_DIM = 2;
+
+    for (int i = 0; i < SPACE_DIM; i++) {
+        dst[i] = 0.0;
+        dst[i] += src[0] * A[i * 3 + 0];
+        dst[i] += src[1] * A[i * 3 + 1];
+    }
+}
+
+__device__ void applyTransformOnDevice(float *dst, float *src, float *A) {
     const int SPACE_DIM = 2;
 
     for (int i = 0; i < SPACE_DIM; i++) {

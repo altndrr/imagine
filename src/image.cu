@@ -4,6 +4,7 @@
 #include "../include/kernel.h"
 #include "../libs/stb/stb_image.h"
 #include "../libs/stb/stb_image_write.h"
+#include <bits/stdc++.h>
 #include <cuda_runtime.h>
 #include <queue>
 #include <stdexcept>
@@ -383,40 +384,100 @@ void Image::findHomography(float *A, int *currentCorners, int *previousCorners,
     const int N_POINTS = 3;
     const int SPACE_DIM = 2;
 
+    int size = N_POINTS * (SPACE_DIM + 1) * maxIter;
+    float *matrices = new float[size];
+    float *scores = new float[maxIter];
+
+    // Estimate maxIter different rigid transformations.
+    // The algorithm estimates a matrix using a triplet of points.
     if (strcmp(_device, _validDevices[0]) == 0) {
-        // Estimate maxIter different rigid transformations.
-        // The algorithm estimates a matrix using a triplet of points.
-        float *matrices = new float[N_POINTS * (SPACE_DIM + 1) * maxIter];
-        float *scores = new float[maxIter];
         findHomographyRANSACOnHost(matrices, scores, maxIter, currentCorners,
                                    previousCorners, maxCorners, getWidth(),
                                    getHeight());
+    } else {
+        // Instantiate matrices on device.
+        size_t matricesBytes = size * sizeof(float);
+        size_t scoresBytes = maxIter * sizeof(float);
+        float *d_matrices, *d_scores;
+        cudaMalloc((float **)&d_matrices, matricesBytes);
+        cudaMalloc((float **)&d_scores, scoresBytes);
 
-        int bestMatrix = -1;
-        float minError = INFINITY;
+        // Copy corners on device.
+        // Copy corner arrays to device.
+        size_t cornersBytes = maxCorners * sizeof(int);
+        int *d_currCorners, *d_prevCorners;
+        cudaMalloc((int **)&d_currCorners, cornersBytes);
+        cudaMalloc((int **)&d_prevCorners, cornersBytes);
+        cudaMemcpy(d_currCorners, currentCorners, cornersBytes,
+                   cudaMemcpyHostToDevice);
+        cudaMemcpy(d_prevCorners, previousCorners, cornersBytes,
+                   cudaMemcpyHostToDevice);
 
-        for (int i = 0; i < maxIter; i++) {
-            if (scores[i] < minError) {
+        // Generate a random list of indices.
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> uniform(0, maxCorners);
+        int *randomIndices = new int[N_POINTS * maxIter];
+        for (int i = 0; i < N_POINTS * maxIter; i++) {
+            randomIndices[i] = uniform(gen);
+        }
+
+        // Copy random indices to device.
+        size_t randomIndicesBytes = N_POINTS * maxIter * sizeof(int);
+        int *d_randomIndices;
+        cudaMalloc((int **)&d_randomIndices, randomIndicesBytes);
+        cudaMemcpy(d_randomIndices, randomIndices, randomIndicesBytes,
+                   cudaMemcpyHostToDevice);
+
+        int blockSize = 1024;
+        dim3 threads(blockSize, 1);
+        dim3 blocks((maxIter + threads.x - 1) / threads.x, 1);
+        findHomographyRANSACOnDevice<<<blocks, threads>>>(
+            d_matrices, d_scores, maxIter, d_currCorners, d_prevCorners,
+            maxCorners, d_randomIndices, getWidth(), getHeight());
+
+        // Copy result to host.
+        cudaMemcpy(matrices, d_matrices, matricesBytes, cudaMemcpyDeviceToHost);
+        cudaMemcpy(scores, d_scores, scoresBytes, cudaMemcpyDeviceToHost);
+        cudaFree(d_matrices);
+        cudaFree(d_scores);
+        cudaFree(d_currCorners);
+        cudaFree(d_prevCorners);
+
+        delete[] randomIndices;
+        cudaFree(d_randomIndices);
+    }
+
+    // Retrieve the best matrix.
+    int bestMatrix = -1;
+    float minError = INFINITY;
+    for (int i = 0; i < maxIter; i++) {
+        if (scores[i] < minError) {
+            int offset = i * (N_POINTS * (SPACE_DIM + 1));
+
+            // Avoid nan transformations.
+            if (matrices[offset] == matrices[offset]) {
                 bestMatrix = i;
                 minError = scores[i];
             }
         }
-
-        int offset = bestMatrix * (N_POINTS * (SPACE_DIM + 1));
-        for (int i = 0; i < N_POINTS * (SPACE_DIM + 1); i++) {
-            if (minError < INFINITY) {
-                A[i] = matrices[offset + i];
-            } else {
-                // If the minError is INFINITY, then set the transformation to
-                // the identity matrix to avoid any type of transformation.
-                int side = sqrt(N_POINTS * (SPACE_DIM + 1));
-                A[i] = int(i % side == (int)i / side);
-            }
-        }
-
-        delete[] matrices;
-        delete[] scores;
     }
+
+    // Copy the best matrix element-wise.
+    int offset = bestMatrix * (N_POINTS * (SPACE_DIM + 1));
+    for (int i = 0; i < N_POINTS * (SPACE_DIM + 1); i++) {
+        if (minError < INFINITY) {
+            A[i] = matrices[offset + i];
+        } else {
+            // If the minError is INFINITY, then set the transformation to
+            // the identity matrix to avoid any type of transformation.
+            int side = sqrt(N_POINTS * (SPACE_DIM + 1));
+            A[i] = int(i % side == (int)i / side);
+        }
+    }
+
+    delete[] matrices;
+    delete[] scores;
 }
 
 void Image::goodFeaturesToTrack(int *corners, int maxCorners,
