@@ -71,8 +71,6 @@ public:
 
     void transpose();
 
-    void warpTransform(float *A);
-
 private:
     const char *_validDevices[2] = {"cpu", "cuda"};
 
