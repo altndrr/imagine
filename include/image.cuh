@@ -55,6 +55,9 @@ public:
 
     void drawPoint(int x, int y, int radius, int *color, int colorSize);
 
+    void findHomography(float *A, int *currentCorners, int *previousCorners,
+                        int maxCorners);
+
     void goodFeaturesToTrack(int *corners, int maxCorners, float qualityLevel,
                              float minDistance);
 

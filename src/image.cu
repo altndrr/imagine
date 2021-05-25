@@ -377,6 +377,48 @@ void Image::drawPoint(int x, int y, int radius, int *color, int colorSize) {
     }
 }
 
+void Image::findHomography(float *A, int *currentCorners, int *previousCorners,
+                           int maxCorners) {
+    const int maxIter = 2000;
+    const int N_POINTS = 3;
+    const int SPACE_DIM = 2;
+
+    if (strcmp(_device, _validDevices[0]) == 0) {
+        // Estimate maxIter different rigid transformations.
+        // The algorithm estimates a matrix using a triplet of points.
+        float *matrices = new float[N_POINTS * (SPACE_DIM + 1) * maxIter];
+        float *scores = new float[maxIter];
+        findHomographyRANSACOnHost(matrices, scores, maxIter, currentCorners,
+                                   previousCorners, maxCorners, getWidth(),
+                                   getHeight());
+
+        int bestMatrix = -1;
+        float minError = INFINITY;
+
+        for (int i = 0; i < maxIter; i++) {
+            if (scores[i] < minError) {
+                bestMatrix = i;
+                minError = scores[i];
+            }
+        }
+
+        int offset = bestMatrix * (N_POINTS * (SPACE_DIM + 1));
+        for (int i = 0; i < N_POINTS * (SPACE_DIM + 1); i++) {
+            if (minError < INFINITY) {
+                A[i] = matrices[offset + i];
+            } else {
+                // If the minError is INFINITY, then set the transformation to
+                // the identity matrix to avoid any type of transformation.
+                int side = sqrt(N_POINTS * (SPACE_DIM + 1));
+                A[i] = int(i % side == (int)i / side);
+            }
+        }
+
+        delete[] matrices;
+        delete[] scores;
+    }
+}
+
 void Image::goodFeaturesToTrack(int *corners, int maxCorners,
                                 float qualityLevel, float minDistance) {
     Image gradX(getFilename(), true);
