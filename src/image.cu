@@ -658,3 +658,42 @@ void Image::transpose() {
                                                getHeight(), getChannels());
     }
 }
+
+void Image::warpTransform(float *A) {
+    unsigned char *dataCopy;
+    const int SPACE_DIM = 2;
+
+    if (strcmp(_device, _validDevices[0]) == 0) {
+        // Create a copy of the data on host.
+        dataCopy = (unsigned char *)malloc(_nBytes);
+        for (int i = 0; i < getSize(); i++) {
+            dataCopy[i] = getData()[i];
+            getData()[i] = 0;
+        }
+
+        // Get the inverse of the matrix.
+        float *Ai = new float[9];
+        invert3x3MatrixOnHost(Ai, A);
+
+        for (int i = 0; i < getWidth() * getHeight(); i++) {
+            float *destPoint = new float[SPACE_DIM];
+            float *srcPoint = new float[SPACE_DIM];
+            destPoint[0] = (int)i / getWidth();
+            destPoint[1] = i % getWidth();
+
+            applyTransformOnHost(srcPoint, destPoint, Ai);
+
+            for (int c = 0; c < getChannels(); c++) {
+                int src_i = getChannels() * (int(srcPoint[0]) * getWidth() +
+                                             int(srcPoint[1])) +
+                            c;
+                int dst_i = getChannels() * i + c;
+
+                if (srcPoint[0] >= 0 and srcPoint[0] < getHeight() and
+                    srcPoint[1] >= 0 and srcPoint[1] < getWidth()) {
+                    getData()[dst_i] = dataCopy[src_i];
+                }
+            }
+        }
+    }
+}
