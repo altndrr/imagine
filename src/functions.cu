@@ -306,44 +306,6 @@ __global__ void cornerScoreOnDevice(unsigned char *gradX, unsigned char *gradY,
     delete[] M;
 }
 
-void histogramOnHost(unsigned char *dst, unsigned char *src, const int width,
-                     const int height, const int channels) {
-    for (int y = 0; y < width; y++) {
-        for (int x = 0; x < height; x++) {
-            for (int c = 0; c < channels; c++) {
-                int ia = channels * (y * width + x) + c;
-                int ib = PIXEL_VALUES * c + int(src[ia]);
-
-                dst[ib] += 1;
-            }
-        }
-    }
-}
-
-__global__ void histogramOnDevice(unsigned char *dst, unsigned char *src,
-                                  const int width, const int height,
-                                  const int channels) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-
-    // Check for overflow.
-    if (i > PIXEL_VALUES * channels) {
-        return;
-    }
-
-    for (int y = 0; y < width; y++) {
-        for (int x = 0; x < height; x++) {
-            for (int c = 0; c < channels; c++) {
-                int ia = channels * (y * width + x) + c;
-                int ib = PIXEL_VALUES * c + int(src[ia]);
-
-                if (ib == i) {
-                    dst[i] += 1;
-                }
-            }
-        }
-    }
-}
-
 void opticalFLowOnHost(int *currentCorners, int *corners, int maxCorners,
                        unsigned char **currPyramidalScales,
                        unsigned char **prevPyramidalScales, int levels,

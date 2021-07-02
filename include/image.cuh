@@ -61,8 +61,6 @@ public:
     void goodFeaturesToTrack(int *corners, int maxCorners, float qualityLevel,
                              float minDistance);
 
-    unsigned char *histogram();
-
     void rotate(double degree);
 
     void scale(float ratio);

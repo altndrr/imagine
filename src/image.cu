@@ -574,37 +574,6 @@ void Image::goodFeaturesToTrack(int *corners, int maxCorners,
     }
 }
 
-unsigned char *Image::histogram() {
-    size_t histBytes = PIXEL_VALUES * getChannels() * sizeof(unsigned char);
-    unsigned char *histogram = (unsigned char *)malloc(histBytes);
-
-    for (int i = 0; i < PIXEL_VALUES * getChannels(); i++) {
-        histogram[i] = 0;
-    }
-
-    if (strcmp(_device, _validDevices[0]) == 0) {
-        histogramOnHost(histogram, getData(), getWidth(), getHeight(),
-                        getChannels());
-    } else {
-        // Copy histogram to device.
-        unsigned char *d_histogram;
-        cudaMalloc((unsigned char **)&d_histogram, histBytes);
-        cudaMemcpy(d_histogram, histogram, histBytes, cudaMemcpyHostToDevice);
-
-        int blockSize = 1024;
-        dim3 threads(blockSize, 1);
-        dim3 blocks((getSize() + threads.x - 1) / threads.x, 1);
-        histogramOnDevice<<<blocks, threads>>>(
-            d_histogram, getData(), getWidth(), getHeight(), getChannels());
-
-        // Copy result to host.
-        cudaMemcpy(histogram, d_histogram, histBytes, cudaMemcpyDeviceToHost);
-        cudaFree(d_histogram);
-    }
-
-    return histogram;
-}
-
 void Image::rotate(double degree) {
     double rad = degree * (M_PI / 180);
     unsigned char *dataCopy;

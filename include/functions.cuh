@@ -40,13 +40,6 @@ void cornerScoreOnHost(unsigned char *gradX, unsigned char *gradY, float *R,
 __global__ void cornerScoreOnDevice(unsigned char *gradX, unsigned char *gradY,
                                     float *R, int width, int height);
 
-void histogramOnHost(unsigned char *dst, unsigned char *src, const int width,
-                     const int height, const int channels);
-
-__global__ void histogramOnDevice(unsigned char *dst, unsigned char *src,
-                                  const int width, const int height,
-                                  const int channels);
-
 void opticalFLowOnHost(int *currentCorners, int *corners, int maxCorners,
                        unsigned char **currPyramidalScales,
                        unsigned char **prevPyramidalScales, int levels,
