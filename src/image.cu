@@ -184,10 +184,10 @@ void Image::setDevice(const char *device) {
 
 void Image::calcOpticalFlow(int *currentCorners, Image *previousFrame,
                             int *corners, int maxCorners, int levels) {
-    Image gray(getFilename(), true);
-    Image prevGray(previousFrame->getFilename(), true);
-    gray.setDevice(getDevice());
-    prevGray.setDevice(getDevice());
+    Image *gray = new Image(getFilename(), true);
+    Image *prevGray = new Image(previousFrame->getFilename(), true);
+    gray->setDevice(getDevice());
+    prevGray->setDevice(getDevice());
 
     if (strcmp(_device, _validDevices[0]) == 0) {
         unsigned char *currPyramidalScales[levels];
@@ -195,15 +195,15 @@ void Image::calcOpticalFlow(int *currentCorners, Image *previousFrame,
 
         // Create the pyramidal scales.
         for (int l = 0; l < levels; l++) {
-            int levelWidth = gray.getWidth() / pow(2, l);
-            int levelHeight = gray.getHeight() / pow(2, l);
-            currPyramidalScales[l] = new unsigned char[gray.getSize()];
-            prevPyramidalScales[l] = new unsigned char[prevGray.getSize()];
+            int levelWidth = gray->getWidth() / pow(2, l);
+            int levelHeight = gray->getHeight() / pow(2, l);
+            currPyramidalScales[l] = new unsigned char[gray->getSize()];
+            prevPyramidalScales[l] = new unsigned char[prevGray->getSize()];
 
             if (l == 0) {
-                for (int i = 0; i < gray.getSize(); i++) {
-                    currPyramidalScales[l][i] = gray.getData()[i];
-                    prevPyramidalScales[l][i] = prevGray.getData()[i];
+                for (int i = 0; i < gray->getSize(); i++) {
+                    currPyramidalScales[l][i] = gray->getData()[i];
+                    prevPyramidalScales[l][i] = prevGray->getData()[i];
                 }
             } else {
                 scaleOnHost(currPyramidalScales[l], currPyramidalScales[l - 1],
@@ -215,7 +215,13 @@ void Image::calcOpticalFlow(int *currentCorners, Image *previousFrame,
 
         opticalFLowOnHost(currentCorners, corners, maxCorners,
                           currPyramidalScales, prevPyramidalScales, levels,
-                          gray.getWidth(), gray.getHeight());
+                          gray->getWidth(), gray->getHeight());
+
+        // Free memory.
+        for (int l = 0; l < levels; l++) {
+            delete[] currPyramidalScales[l];
+            delete[] prevPyramidalScales[l];
+        }
     } else {
         // Copy corner arrays to device.
         size_t cornersBytes = maxCorners * sizeof(int);
@@ -225,7 +231,7 @@ void Image::calcOpticalFlow(int *currentCorners, Image *previousFrame,
         cudaMemcpy(d_corners, corners, cornersBytes, cudaMemcpyHostToDevice);
 
         // Create the pyramidal scales.
-        size_t pyramidBytes = gray.getSize() * sizeof(unsigned char);
+        size_t pyramidBytes = gray->getSize() * sizeof(unsigned char);
         unsigned char *currPyramidalScales, *prevPyramidalScales;
         cudaMalloc((unsigned char **)&currPyramidalScales,
                    levels * pyramidBytes);
@@ -234,27 +240,27 @@ void Image::calcOpticalFlow(int *currentCorners, Image *previousFrame,
         int copyBlockSize = 1024;
         dim3 copyThreads(copyBlockSize, 1);
         dim3 copyBlocks(
-            (gray.getWidth() * gray.getHeight() + copyThreads.x - 1) /
+            (gray->getWidth() * gray->getHeight() + copyThreads.x - 1) /
                 copyThreads.x,
             1);
 
         for (int l = 0; l < levels; l++) {
-            int levelWidth = gray.getWidth() / pow(2, l);
-            int levelHeight = gray.getHeight() / pow(2, l);
+            int levelWidth = gray->getWidth() / pow(2, l);
+            int levelHeight = gray->getHeight() / pow(2, l);
 
             if (l == 0) {
-                cudaMemcpy(currPyramidalScales, gray.getData(), pyramidBytes,
+                cudaMemcpy(currPyramidalScales, gray->getData(), pyramidBytes,
                            cudaMemcpyDeviceToDevice);
-                cudaMemcpy(prevPyramidalScales, prevGray.getData(),
+                cudaMemcpy(prevPyramidalScales, prevGray->getData(),
                            pyramidBytes, cudaMemcpyDeviceToDevice);
             } else {
                 scaleOnDevice<<<copyBlocks, copyThreads>>>(
-                    currPyramidalScales + l * gray.getSize(),
-                    currPyramidalScales + (l - 1) * gray.getSize(), 0.5,
+                    currPyramidalScales + l * gray->getSize(),
+                    currPyramidalScales + (l - 1) * gray->getSize(), 0.5,
                     levelWidth * 2, levelHeight * 2, 1);
                 scaleOnDevice<<<copyBlocks, copyThreads>>>(
-                    prevPyramidalScales + l * gray.getSize(),
-                    prevPyramidalScales + (l - 1) * gray.getSize(), 0.5,
+                    prevPyramidalScales + l * gray->getSize(),
+                    prevPyramidalScales + (l - 1) * gray->getSize(), 0.5,
                     levelWidth * 2, levelHeight * 2, 1);
             }
         }
@@ -264,8 +270,8 @@ void Image::calcOpticalFlow(int *currentCorners, Image *previousFrame,
         dim3 blocks((maxCorners + copyThreads.x - 1) / copyThreads.x, 1);
         opticalFLowOnDevice<<<blocks, threads>>>(
             d_currCorners, d_corners, maxCorners, currPyramidalScales,
-            prevPyramidalScales, levels, gray.getSize(), gray.getWidth(),
-            gray.getHeight());
+            prevPyramidalScales, levels, gray->getSize(), gray->getWidth(),
+            gray->getHeight());
 
         cudaMemcpy(currentCorners, d_currCorners, cornersBytes,
                    cudaMemcpyDeviceToHost);
@@ -276,6 +282,10 @@ void Image::calcOpticalFlow(int *currentCorners, Image *previousFrame,
         cudaFree(currPyramidalScales);
         cudaFree(prevPyramidalScales);
     }
+
+    // Free memory.
+    delete gray;
+    delete prevGray;
 }
 
 void Image::convolution(float *kernel, int kernelSide) {
@@ -290,6 +300,9 @@ void Image::convolution(float *kernel, int kernelSide) {
 
         convolutionOnHost(getData(), dataCopy, kernel, kernelSide, getWidth(),
                           getHeight(), getChannels());
+
+        // Free memory.
+        free(dataCopy);
     } else {
         // Create a copy of the data on device.
         cudaMalloc((unsigned char **)&dataCopy, _nBytes);
@@ -310,6 +323,7 @@ void Image::convolution(float *kernel, int kernelSide) {
                                                  getHeight(), getChannels());
 
         // Free memory.
+        cudaFree(d_kernel);
         cudaFree(dataCopy);
     }
 }
@@ -345,6 +359,9 @@ void Image::drawLine(int x1, int y1, int x2, int y2, int radius, int *color,
         drawLineOnDevice<<<blocks, threads>>>(getData(), x1, y1, x2, y2, radius,
                                               d_color, colorSize, getWidth(),
                                               getHeight(), getChannels());
+
+        // Free memory.
+        cudaFree(d_color);
     }
 }
 
@@ -375,6 +392,9 @@ void Image::drawPoint(int x, int y, int radius, int *color, int colorSize) {
         drawPointOnDevice<<<blocks, threads>>>(getData(), x, y, radius, d_color,
                                                colorSize, getWidth(),
                                                getHeight(), getChannels());
+
+        // Free memory.
+        cudaFree(d_color);
     }
 }
 
@@ -482,23 +502,23 @@ void Image::findHomography(float *A, int *currentCorners, int *previousCorners,
 
 void Image::goodFeaturesToTrack(int *corners, int maxCorners,
                                 float qualityLevel, float minDistance) {
-    Image gradX(getFilename(), true);
-    Image gradY(getFilename(), true);
-    gradX.setDevice(getDevice());
-    gradY.setDevice(getDevice());
+    Image *gradX = new Image(getFilename(), true);
+    Image *gradY = new Image(getFilename(), true);
+    gradX->setDevice(getDevice());
+    gradY->setDevice(getDevice());
 
     int side;
     float *sobelX, *sobelY;
     Kernel::SobelX(&sobelX, &side);
     Kernel::SobelY(&sobelY);
-    gradX.convolution(sobelX, side);
-    gradY.convolution(sobelY, side);
+    gradX->convolution(sobelX, side);
+    gradY->convolution(sobelY, side);
 
     int scoreSize = getWidth() * getHeight();
     float *scoreMatrix = new float[scoreSize];
 
     if (strcmp(_device, _validDevices[0]) == 0) {
-        cornerScoreOnHost(gradX.getData(), gradY.getData(), scoreMatrix,
+        cornerScoreOnHost(gradX->getData(), gradY->getData(), scoreMatrix,
                           getWidth(), getHeight());
     } else {
         // Copy corner array to device.
@@ -511,13 +531,15 @@ void Image::goodFeaturesToTrack(int *corners, int maxCorners,
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
         dim3 blocks((scoreSize + threads.x - 1) / threads.x, 1);
-        cornerScoreOnDevice<<<blocks, threads>>>(gradX.getData(),
-                                                 gradY.getData(), d_scoreMatrix,
-                                                 getWidth(), getHeight());
+        cornerScoreOnDevice<<<blocks, threads>>>(
+            gradX->getData(), gradY->getData(), d_scoreMatrix, getWidth(),
+            getHeight());
 
         // Copy result to host.
         cudaMemcpy(scoreMatrix, d_scoreMatrix, scoreMatrixBytes,
                    cudaMemcpyDeviceToHost);
+
+        // Free memory.
         cudaFree(d_scoreMatrix);
     }
 
@@ -572,6 +594,16 @@ void Image::goodFeaturesToTrack(int *corners, int maxCorners,
             qR.pop();
         } while (not isDistant);
     }
+
+    // Free memory.
+    while (!qR.empty()) {
+        qR.pop();
+    }
+    delete[] scoreMatrix;
+    delete gradX;
+    delete gradY;
+    delete[] sobelX;
+    delete[] sobelY;
 }
 
 void Image::rotate(double degree) {
@@ -587,6 +619,9 @@ void Image::rotate(double degree) {
 
         rotateOnHost(getData(), dataCopy, rad, getWidth(), getHeight(),
                      getChannels());
+
+        // Free memory.
+        free(dataCopy);
     } else {
         // Copy histogram to device.
         cudaMalloc((unsigned char **)&dataCopy, _nBytes);
@@ -597,6 +632,9 @@ void Image::rotate(double degree) {
         dim3 blocks((getWidth() * getHeight() + threads.x - 1) / threads.x, 1);
         rotateOnDevice<<<blocks, threads>>>(
             getData(), dataCopy, rad, getWidth(), getHeight(), getChannels());
+
+        // Free memory.
+        cudaFree(dataCopy);
     }
 }
 
@@ -638,6 +676,9 @@ void Image::scale(float ratio) {
         free(_h_data);
         _h_data = (unsigned char *)malloc(newBytes);
         cudaMemcpy(_h_data, _d_data, newBytes, cudaMemcpyDeviceToHost);
+
+        // Free memory.
+        cudaFree(newData);
     }
 
     // Update other attributes.
@@ -658,6 +699,9 @@ void Image::translate(int px, int py) {
 
         translateOnHost(getData(), dataCopy, px, py, getWidth(), getHeight(),
                         getChannels());
+
+        // Free memory.
+        free(dataCopy);
     } else {
         // Copy histogram to device.
         cudaMalloc((unsigned char **)&dataCopy, _nBytes);
@@ -669,6 +713,9 @@ void Image::translate(int px, int py) {
         translateOnDevice<<<blocks, threads>>>(getData(), dataCopy, px, py,
                                                getWidth(), getHeight(),
                                                getChannels());
+
+        // Free memory.
+        cudaFree(dataCopy);
     }
 }
 

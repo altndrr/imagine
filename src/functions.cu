@@ -249,6 +249,11 @@ void cornerScoreOnHost(unsigned char *gradX, unsigned char *gradY, float *R,
         float lambda1 = m + sqrt(m * m - p);
         float lambda2 = m - sqrt(m * m - p);
         R[i] = min(lambda1, lambda2);
+
+        // Free memory.
+        delete[] Ix;
+        delete[] Iy;
+        delete[] M;
     }
 }
 
@@ -293,9 +298,6 @@ __global__ void cornerScoreOnDevice(unsigned char *gradX, unsigned char *gradY,
     sumOfMatmulOnDevice(&M[2], Iy, Ix, windowSide);
     sumOfMatmulOnDevice(&M[3], Iy, Iy, windowSide);
 
-    delete[] Ix;
-    delete[] Iy;
-
     // Evaluate the pixel score.
     float m = (M[0] + M[3]) / 2;
     float p = (M[0] * M[3]) - (M[1] * M[2]);
@@ -303,6 +305,9 @@ __global__ void cornerScoreOnDevice(unsigned char *gradX, unsigned char *gradY,
     float lambda2 = m - sqrt(m * m - p);
     R[i] = min(lambda1, lambda2);
 
+    // Free memory.
+    delete[] Ix;
+    delete[] Iy;
     delete[] M;
 }
 
@@ -723,6 +728,8 @@ void sumOfMatmulOnHost(float *total, float *A, float *B, int side) {
 
         *total += C[i];
     }
+
+    delete[] C;
 }
 
 __device__ void sumOfMatmulOnDevice(float *total, float *A, float *B,
