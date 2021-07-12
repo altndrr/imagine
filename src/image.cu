@@ -265,18 +265,36 @@ void Image::calcOpticalFlow(int *currentCorners, Image *previousFrame,
             }
         }
 
+        // Determine grid size for parallel operations.
+        const int N_STREAMS = 1;
+        int iElem = maxCorners / N_STREAMS;
+        size_t iBytes = iElem * sizeof(int);
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
-        dim3 blocks((maxCorners + copyThreads.x - 1) / copyThreads.x, 1);
-        opticalFLowOnDevice<<<blocks, threads>>>(
-            d_currCorners, d_corners, maxCorners, currPyramidalScales,
-            prevPyramidalScales, levels, gray->getSize(), gray->getWidth(),
-            gray->getHeight());
+        dim3 blocks((iElem + copyThreads.x - 1) / copyThreads.x, 1);
 
-        cudaMemcpy(currentCorners, d_currCorners, cornersBytes,
-                   cudaMemcpyDeviceToHost);
+        // Create the streams.
+        cudaStream_t stream[N_STREAMS];
+        for (int i = 0; i < N_STREAMS; i++) {
+            cudaStreamCreate(&stream[i]);
+        }
+
+        // Initialise all work on the device asynchronously in depth-first
+        // order.
+        for (int i = 0; i < N_STREAMS; i++) {
+            int i_offset = i * iElem;
+            opticalFLowOnDevice<<<blocks, threads, 0, stream[i]>>>(
+                &d_currCorners[i_offset], &d_corners[i_offset], maxCorners,
+                currPyramidalScales, prevPyramidalScales, levels,
+                gray->getSize(), gray->getWidth(), gray->getHeight());
+            cudaMemcpyAsync(&currentCorners[i_offset], &d_currCorners[i_offset],
+                            iBytes, cudaMemcpyDeviceToHost, stream[i]);
+        }
 
         // Free memory.
+        for (int i = 0; i < N_STREAMS; i++) {
+            cudaStreamDestroy(stream[i]);
+        }
         cudaFree(d_corners);
         cudaFree(d_currCorners);
         cudaFree(currPyramidalScales);
@@ -525,21 +543,38 @@ void Image::goodFeaturesToTrack(int *corners, int maxCorners,
         size_t scoreMatrixBytes = scoreSize * sizeof(float);
         float *d_scoreMatrix;
         cudaMalloc((float **)&d_scoreMatrix, scoreMatrixBytes);
-        cudaMemcpy(d_scoreMatrix, scoreMatrix, scoreMatrixBytes,
-                   cudaMemcpyHostToDevice);
 
+        // Determine grid size for parallel operations.
+        const int N_STREAMS = 7;
+        int iElem = scoreSize / N_STREAMS;
+        size_t iBytes = iElem * sizeof(float);
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
-        dim3 blocks((scoreSize + threads.x - 1) / threads.x, 1);
-        cornerScoreOnDevice<<<blocks, threads>>>(
-            gradX->getData(), gradY->getData(), d_scoreMatrix, getWidth(),
-            getHeight());
+        dim3 blocks((iElem + threads.x - 1) / threads.x, 1);
 
-        // Copy result to host.
-        cudaMemcpy(scoreMatrix, d_scoreMatrix, scoreMatrixBytes,
-                   cudaMemcpyDeviceToHost);
+        // Create the streams.
+        cudaStream_t stream[N_STREAMS];
+        for (int i = 0; i < N_STREAMS; i++) {
+            cudaStreamCreate(&stream[i]);
+        }
+
+        // Initialise all work on the device asynchronously in depth-first
+        // order.
+        for (int i = 0; i < N_STREAMS; i++) {
+            int i_offset = i * iElem;
+            cudaMemcpyAsync(&d_scoreMatrix[i_offset], &scoreMatrix[i_offset],
+                            iBytes, cudaMemcpyHostToDevice, stream[i]);
+            cornerScoreOnDevice<<<blocks, threads, 0, stream[i]>>>(
+                gradX->getData(), gradY->getData(), &d_scoreMatrix[i_offset],
+                getWidth(), getHeight());
+            cudaMemcpyAsync(&scoreMatrix[i_offset], &d_scoreMatrix[i_offset],
+                            iBytes, cudaMemcpyDeviceToHost, stream[i]);
+        }
 
         // Free memory.
+        for (int i = 0; i < N_STREAMS; i++) {
+            cudaStreamDestroy(stream[i]);
+        }
         cudaFree(d_scoreMatrix);
     }
 
