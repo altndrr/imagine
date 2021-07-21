@@ -6,7 +6,8 @@
 #include "../libs/stb/stb_image_write.h"
 #include <bits/stdc++.h>
 #include <cuda_runtime.h>
-#include <queue>
+#include <thrust/device_vector.h>
+#include <thrust/sort.h>
 #include <stdexcept>
 
 Image::Image(const char *filename, bool grayscale) {
@@ -266,35 +267,20 @@ void Image::calcOpticalFlow(int *currentCorners, Image *previousFrame,
         }
 
         // Determine grid size for parallel operations.
-        const int N_STREAMS = 1;
-        int iElem = maxCorners / N_STREAMS;
-        size_t iBytes = iElem * sizeof(int);
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
-        dim3 blocks((iElem + copyThreads.x - 1) / copyThreads.x, 1);
-
-        // Create the streams.
-        cudaStream_t stream[N_STREAMS];
-        for (int i = 0; i < N_STREAMS; i++) {
-            cudaStreamCreate(&stream[i]);
-        }
+        dim3 blocks((maxCorners + copyThreads.x - 1) / copyThreads.x, 1);
 
         // Initialise all work on the device asynchronously in depth-first
         // order.
-        for (int i = 0; i < N_STREAMS; i++) {
-            int i_offset = i * iElem;
-            opticalFLowOnDevice<<<blocks, threads, 0, stream[i]>>>(
-                &d_currCorners[i_offset], &d_corners[i_offset], maxCorners,
-                currPyramidalScales, prevPyramidalScales, levels,
-                gray->getSize(), gray->getWidth(), gray->getHeight());
-            cudaMemcpyAsync(&currentCorners[i_offset], &d_currCorners[i_offset],
-                            iBytes, cudaMemcpyDeviceToHost, stream[i]);
-        }
+        opticalFLowOnDevice<<<blocks, threads>>>(
+            d_currCorners, d_corners, maxCorners, currPyramidalScales,
+            prevPyramidalScales, levels, gray->getSize(), gray->getWidth(),
+            gray->getHeight());
+        cudaMemcpy(currentCorners, d_currCorners, cornersBytes,
+                   cudaMemcpyDeviceToHost);
 
         // Free memory.
-        for (int i = 0; i < N_STREAMS; i++) {
-            cudaStreamDestroy(stream[i]);
-        }
         cudaFree(d_corners);
         cudaFree(d_currCorners);
         cudaFree(currPyramidalScales);
@@ -535,9 +521,21 @@ void Image::goodFeaturesToTrack(int *corners, int maxCorners,
     int scoreSize = getWidth() * getHeight();
     float *scoreMatrix = new float[scoreSize];
 
+    int *keys = new int[scoreSize];
+    float *values = new float[scoreSize];
+
     if (strcmp(_device, _validDevices[0]) == 0) {
         cornerScoreOnHost(gradX->getData(), gradY->getData(), scoreMatrix,
                           getWidth(), getHeight());
+
+        // Sort values.
+        thrust::host_vector<int> h_keys(scoreSize, 0);
+        thrust::sequence(h_keys.begin(), h_keys.end());
+        thrust::stable_sort_by_key(scoreMatrix, scoreMatrix + scoreSize,
+                                   h_keys.begin(), thrust::greater<float>());
+
+        thrust::copy(h_keys.begin(), h_keys.end(), keys);
+        thrust::copy(scoreMatrix, scoreMatrix + scoreSize, values);
     } else {
         // Copy corner array to device.
         size_t scoreMatrixBytes = scoreSize * sizeof(float);
@@ -545,56 +543,27 @@ void Image::goodFeaturesToTrack(int *corners, int maxCorners,
         cudaMalloc((float **)&d_scoreMatrix, scoreMatrixBytes);
 
         // Determine grid size for parallel operations.
-        const int N_STREAMS = 7;
-        int iElem = scoreSize / N_STREAMS;
-        size_t iBytes = iElem * sizeof(float);
         int blockSize = 1024;
         dim3 threads(blockSize, 1);
-        dim3 blocks((iElem + threads.x - 1) / threads.x, 1);
+        dim3 blocks((scoreSize + threads.x - 1) / threads.x, 1);
 
-        // Create the streams.
-        cudaStream_t stream[N_STREAMS];
-        for (int i = 0; i < N_STREAMS; i++) {
-            cudaStreamCreate(&stream[i]);
-        }
+        cornerScoreOnDevice<<<blocks, threads>>>(
+            gradX->getData(), gradY->getData(), d_scoreMatrix, getWidth(),
+            getHeight());
 
-        // Initialise all work on the device asynchronously in depth-first
-        // order.
-        for (int i = 0; i < N_STREAMS; i++) {
-            int i_offset = i * iElem;
-            cudaMemcpyAsync(&d_scoreMatrix[i_offset], &scoreMatrix[i_offset],
-                            iBytes, cudaMemcpyHostToDevice, stream[i]);
-            cornerScoreOnDevice<<<blocks, threads, 0, stream[i]>>>(
-                gradX->getData(), gradY->getData(), &d_scoreMatrix[i_offset],
-                getWidth(), getHeight());
-            cudaMemcpyAsync(&scoreMatrix[i_offset], &d_scoreMatrix[i_offset],
-                            iBytes, cudaMemcpyDeviceToHost, stream[i]);
-        }
+        // Sort values.
+        thrust::device_ptr<float> d_values(d_scoreMatrix);
+        thrust::device_vector<int> d_keys(scoreSize, 0);
 
-        // Free memory.
-        for (int i = 0; i < N_STREAMS; i++) {
-            cudaStreamDestroy(stream[i]);
-        }
-        cudaFree(d_scoreMatrix);
+        thrust::sequence(d_keys.begin(), d_keys.end());
+        thrust::stable_sort_by_key(d_values, d_values + scoreSize,
+                                   d_keys.begin(), thrust::greater<float>());
+        thrust::copy(d_keys.begin(), d_keys.end(), keys);
+        thrust::copy(d_values, d_values + scoreSize, values);
     }
 
-    // Create a priority queue of the scores and store the highest score.
-    std::priority_queue<std::pair<float, int>> qR;
-    float strongestScore = 0.00;
-    for (int i = 0; i < scoreSize; i++) {
-        // Skip nan values.
-        if (scoreMatrix[i] != scoreMatrix[i]) {
-            continue;
-        }
-
-        qR.push(std::pair<float, int>(scoreMatrix[i], i));
-        if (strongestScore < scoreMatrix[i]) {
-            strongestScore = scoreMatrix[i];
-        }
-    }
-
-    // Extract the top-K corners.
-    float threshold = strongestScore * qualityLevel;
+    float threshold = values[0] * qualityLevel;
+    int top = 0;
     for (int i = 0; i < maxCorners; ++i) {
         corners[i] = -1;
         float kValue;
@@ -602,8 +571,8 @@ void Image::goodFeaturesToTrack(int *corners, int maxCorners,
         bool isDistant;
 
         do {
-            kValue = qR.top().first;
-            kIndex = qR.top().second;
+            kValue = values[top];
+            kIndex = keys[top];
             isDistant = true;
 
             // Evaluate the Euclidean distance to the previous corners.
@@ -626,19 +595,18 @@ void Image::goodFeaturesToTrack(int *corners, int maxCorners,
                 }
             }
 
-            qR.pop();
+            top++;
         } while (not isDistant);
     }
 
     // Free memory.
-    while (!qR.empty()) {
-        qR.pop();
-    }
-    delete[] scoreMatrix;
     delete gradX;
     delete gradY;
     delete[] sobelX;
     delete[] sobelY;
+    delete[] scoreMatrix;
+    delete[] keys;
+    delete[] values;
 }
 
 void Image::rotate(double degree) {
