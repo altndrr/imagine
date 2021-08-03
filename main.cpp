@@ -228,10 +228,6 @@ int main(int argc, char *argv[]) {
 
         float *A = new float[9];
         image2.findHomography(A, currCorners, corners, maxCorners);
-        for (int i = 0; i < 9; i++) {
-            printf("%f ", A[i]);
-        }
-        printf("\n");
         float dx = A[2];
         float dy = A[5];
         float da = atan2(A[3], A[0]);
