@@ -7,6 +7,7 @@
 #include <bits/stdc++.h>
 #include <cuda_runtime.h>
 #include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
 #include <thrust/sort.h>
 #include <stdexcept>
 

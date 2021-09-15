@@ -16,6 +16,8 @@ void commandVersion() {
 }
 
 int main(int argc, char *argv[]) {
+    cudaFree(0);
+
     // If no argument is passed, call help command.
     if (argc == 1) {
         commandHelp();
@@ -36,7 +38,6 @@ int main(int argc, char *argv[]) {
     bool time = (arrayContains(argv, "--time") == 1);
     double startTime = cpuSecond();
     const char *device = (arrayContains(argv, "--cuda") == 1) ? "cuda" : "cpu";
-    cudaFree(0);
     printf("Device: %s\n", device);
 
     // Call transpose command.
